@@ -1,4 +1,4 @@
-module github.com/OneStoop/hookdb
+module github.com/ErmineDB/ErmineDB
 
 go 1.17
 
