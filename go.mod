@@ -26,6 +26,7 @@ require (
 	github.com/klauspost/compress v1.12.3 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
+	github.com/shamaton/msgpack/v2 v2.1.0 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.opencensus.io v0.22.5 // indirect
 	golang.org/x/net v0.0.0-20201021035429-f5854403a974 // indirect
