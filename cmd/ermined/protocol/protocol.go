@@ -75,7 +75,7 @@ func procArgs(data []string) *argObj {
 }
 
 func Commands() []string {
-    commands := []string{"Append", "Command", "Config", "Dbsize", "Del", "Exists", "Get", "Hget", "Hgetall", "Hset", "Keys", "Ping", "Select", "Set"}
+    commands := []string{"Append", "Command", "Config", "Dbsize", "Del", "Exists", "Get", "Hdel", "Hget", "Hgetall", "Hset", "Keys", "Ping", "Select", "Set"}
     return commands
 }
 
@@ -105,6 +105,9 @@ func Call(funcName string, params ...interface{}) string {
             hdl := params[1].(ProtoHandler)
             results = hdl.Get(params[0].([]string), []byte("bucket0"))
 //             results = Get(params[0].([]string), []byte("bucket0"))
+        case "Hdel":
+            hdl := params[1].(ProtoHandler)
+            results = hdl.Hdel(params[0].([]string), []byte("bucket0"))
         case "Hget":
             hdl := params[1].(ProtoHandler)
             results = hdl.Hget(params[0].([]string), []byte("bucket0"))
@@ -321,6 +324,58 @@ func (h *ProtoHandler) Get(data []string, bucketName []byte) string {
     }
 }
 
+func (h *ProtoHandler) Hdel(data []string, bucketName []byte) string {
+    if h.s.Raft.State() != raft.Leader {
+        return h.forwardToLeader(data)
+    }
+
+    argobj := procArgs(data)
+//     gob.Register(map[string]string{})
+
+    resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
+    resLen := len(resultObj)
+
+    if resLen == 0 {
+//         log.Printf("returning because reLen == 0")
+        return "$-1\r\n"
+    } else {
+        var m dataStoreJson
+        err := msgpack.Unmarshal(resultObj, &m)
+        if err != nil {
+            panic(err)
+        }
+
+        if m.Type != "hash" {
+            message := "-ERR WRONGTYPE Operation against a key holding the wrong kind of value"
+            return formatter.BulkString(message)
+        }
+
+        mobj := m.Data
+
+        c := 0
+        for i := 0; i < len(mobj); i++ {
+            for j := 1; j < len(argobj.args); j++ {
+                _, found := mobj[argobj.args[j]]
+                if found {
+                    delete(mobj, argobj.args[j])
+                    c++
+                    break
+                }
+            }
+        }
+
+        m.Data = mobj
+
+        do, err := msgpack.Marshal(&m)
+        if err != nil {
+            panic(err)
+        }
+        h.s.RaftSet(data[3], do)
+
+        return formatter.Integer(c)
+    }
+}
+
 func (h *ProtoHandler) Hget(data []string, bucketName []byte) string {
     argobj := procArgs(data)
 //     gob.Register(map[string]string{})
@@ -393,22 +448,37 @@ func (h *ProtoHandler) Hset(data []string, bucketName []byte) string {
         return h.forwardToLeader(data)
     }
 
-
-    timeStamp := time.Now().UnixNano() / int64(time.Millisecond)
-
-    //     setup a data container
-    var exp int64
-    exp = 0
-
-    dataObj := &dataStoreJson{
-        created: timeStamp,
-        EXP: exp,
-        Type: "hash",
-        Data: map[string]string{}}
-
     argobj := procArgs(data)
-//     log.Printf("argobj: ", argobj)
-    d := make(map[string]string)
+    resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
+    resLen := len(resultObj)
+
+    var dataObj dataStoreJson
+
+    if resLen == 0 {
+        timeStamp := time.Now().UnixNano() / int64(time.Millisecond)
+
+        //     setup a data container
+        var exp int64
+        exp = 0
+
+        dataObj.created = timeStamp
+        dataObj.EXP = exp
+        dataObj.Type = "hash"
+        dataObj.Data = map[string]string{}
+    } else {
+        err := msgpack.Unmarshal(resultObj, &dataObj)
+        if err != nil {
+            panic(err)
+        }
+
+        if dataObj.Type != "hash" {
+            message := "-ERR WRONGTYPE Operation against a key holding the wrong kind of value"
+            return formatter.BulkString(message)
+        }
+    }
+
+//     d := make(map[string]string)
+    d := dataObj.Data
     c := 0
     for i:=1; i<len(argobj.args); i = i+2 {
         if i+1 < len(argobj.args) {
