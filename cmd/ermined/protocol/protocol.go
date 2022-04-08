@@ -30,23 +30,6 @@ func NewProtoHandler(s *eRaft.Server) *ProtoHandler {
     return &ProtoHandler{s: s}
 }
 
-
-
-// var funcMap = map[string]interface{}{
-//     "Append": Append,
-//     "Command": Command,
-//     "Config": Config,
-//     "Dbsize": Dbsize,
-//     "Del": Del,
-//     "Exists": Exists,
-//     "Get": Get,
-//     "keys": Keys,
-//     "Ping": Ping,
-//     "Select": Select,
-//     "Set": Set,
-// }
-
-
 type jsonObj struct {
     created int64   `json:"created"`
     EXP int64       `json:"EXP"`
@@ -92,7 +75,7 @@ func procArgs(data []string) *argObj {
 }
 
 func Commands() []string {
-    commands := []string{"Append", "Command", "Config", "Dbsize", "Del", "Exists", "Get", "Hget", "Hset", "Keys", "Ping", "Select", "Set"}
+    commands := []string{"Append", "Command", "Config", "Dbsize", "Del", "Exists", "Get", "Hget", "Hgetall", "Hset", "Keys", "Ping", "Select", "Set"}
     return commands
 }
 
@@ -125,6 +108,9 @@ func Call(funcName string, params ...interface{}) string {
         case "Hget":
             hdl := params[1].(ProtoHandler)
             results = hdl.Hget(params[0].([]string), []byte("bucket0"))
+        case "Hgetall":
+            hdl := params[1].(ProtoHandler)
+            results = hdl.Hgetall(params[0].([]string), []byte("bucket0"))
         case "Hset":
             hdl := params[1].(ProtoHandler)
             results = hdl.Hset(params[0].([]string), []byte("bucket0"))
@@ -346,25 +332,17 @@ func (h *ProtoHandler) Hget(data []string, bucketName []byte) string {
 //         log.Printf("returning because reLen == 0")
         return "$-1\r\n"
     } else {
-//         buf := bytes.NewBuffer(resultObj)
-//         dec := gob.NewDecoder(buf)
-//         m := make(map[string]interface{})
-//         if err := dec.Decode(&m); err != nil {
-//             log.Fatal(err)
-//         }
         var m dataStoreJson
         err := msgpack.Unmarshal(resultObj, &m)
         if err != nil {
             panic(err)
         }
 
-//         if m["type"] != "hash" {
         if m.Type != "hash" {
             message := "-ERR WRONGTYPE Operation against a key holding the wrong kind of value"
             return formatter.BulkString(message)
         }
-//         result, _ := helpers.FindInterface(m,"data")
-//         mobj, _ := result.(map[string]string)
+
         mobj := m.Data
         val, found := mobj[argobj.args[1]]
 
@@ -374,6 +352,38 @@ func (h *ProtoHandler) Hget(data []string, bucketName []byte) string {
             return formatter.BulkString(fmt.Sprintf("%v", val))
         }
         return "$-1\r\n"
+    }
+}
+
+func (h *ProtoHandler) Hgetall(data []string, bucketName []byte) string {
+    argobj := procArgs(data)
+//     gob.Register(map[string]string{})
+
+    resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
+    resLen := len(resultObj)
+
+    if resLen == 0 {
+//         log.Printf("returning because reLen == 0")
+        return "$-1\r\n"
+    } else {
+        var m dataStoreJson
+        err := msgpack.Unmarshal(resultObj, &m)
+        if err != nil {
+            panic(err)
+        }
+
+        if m.Type != "hash" {
+            message := "-ERR WRONGTYPE Operation against a key holding the wrong kind of value"
+            return formatter.BulkString(message)
+        }
+
+        mobj := m.Data
+        var returnString []string
+        for key, element := range mobj {
+            returnString = append(returnString, key)
+            returnString = append(returnString, element)
+        }
+        return formatter.List(returnString)
     }
 }
 
