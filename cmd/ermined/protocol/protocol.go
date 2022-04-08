@@ -3,13 +3,15 @@ package protocol
 import (
 //     "errorÎs"
     "strings"
-    "bytes"
+//     "bytes"
     "fmt"
     "time"
     "strconv"
     "log"
 //     "reflect"
-    "encoding/gob"
+//     "encoding/gob"
+//     "encoding/json"
+    "github.com/shamaton/msgpack/v2"
     "github.com/gobwas/glob"
     "github.com/ErmineDB/ErmineDB/cmd/ermined/eRaft"
 //     "github.com/ErmineDB/ErmineDB/cmd/ermined/database"
@@ -43,6 +45,28 @@ func NewProtoHandler(s *eRaft.Server) *ProtoHandler {
 //     "Select": Select,
 //     "Set": Set,
 // }
+
+
+type jsonObj struct {
+    created int64   `json:"created"`
+    EXP int64       `json:"EXP"`
+    Type string     `json:"type"`
+    Data string     `json:"data"`
+}
+
+type dataStore struct {
+    created int64
+    EXP int64
+    Type string
+    Data string
+}
+
+type dataStoreJson struct {
+    created int64
+    EXP int64
+    Type string
+    Data map[string]string
+}
 
 type argObj struct {
     command string
@@ -143,26 +167,6 @@ func (h *ProtoHandler) forwardToLeader(data []string) string {
         }
     }
 
-//     if err := configFuture.Error(); err != nil {
-//         log.Printf("config error")
-//         return "$-1\r\n"
-//     } else {
-//     for _, peer := range configFuture.Configuration().Servers {
-//         log.Printf("%v", peer.Address)
-//         if peer.Address == h.s.Raft.Leader() {
-//     x := fmt.Sprintf("-MOVED 0 %v \r\n", h.s.Raft.Leader())
-//     log.Printf("This is x %v", x)
-//     return x
-//                 peerRaft, httpPort := parsePeer(string(peer.ID))
-// 				url = fmt.Sprintf("http://%s:%s", strings.Split(peerRaft, ":")[0], httpPort) // TODO this may need to be customized
-//         }
-//     }
-//         if len(url) == 0 {
-// 			onError(w, errors.New("leader not found"), http.StatusBadGateway)
-//             return "$-1\r\n"
-//         }
-//     }
-// //     log.Printf("why did I make it here?")
     return "$-1\r\n"
 }
 
@@ -190,42 +194,41 @@ func (h *ProtoHandler) Append(data []string, bucketName []byte) string {
     timeStamp := time.Now().UnixNano() / int64(time.Millisecond)
     var exp int64
     exp = 0
-    dataObj := map[string]interface{}{
-        "created": timeStamp,
-        "EXP": exp,
-        "type": "+",
-        "data": "",
-    }
+    dataObj := &dataStore{
+        created: timeStamp,
+        EXP: exp,
+        Type: "$",
+        Data: ""}
 
     argobj := procArgs(data)
-//     resultObj, resLen := database.QueryDB(bucketName, []byte(data[3]))
     resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
     resLen := len(resultObj)
 
     if resLen != 0 {
-        buf := bytes.NewBuffer(resultObj)
-        dec := gob.NewDecoder(buf)
-        m := make(map[string]interface{})
-        if err := dec.Decode(&m); err != nil {
-            log.Fatal(err)
+        var m dataStore
+        err := msgpack.Unmarshal(resultObj, &m)
+        if err != nil {
+            panic(err)
         }
 
-        oldData, _ := helpers.FindInterface(m,"data")
-//         log.Printf("oldData in Append: %v", oldData)
-        dataObj["data"] = oldData.(string) + data[5]
+        oldData := m.Data
+        if m.Type != "$" {
+            message := "-ERR WRONGTYPE Operation against a key holding the wrong kind of value"
+            return formatter.BulkString(message)
+        }
+
+        dataObj.Data = oldData + data[5]
     } else {
 
-        dataObj["data"] = data[5]
+        dataObj.Data = data[5]
     }
 
-    var buf bytes.Buffer
-    enc := gob.NewEncoder(&buf)
-    if err := enc.Encode(dataObj); err != nil {
-        log.Fatal(err)
+    do, err := msgpack.Marshal(&dataObj)
+    if err != nil {
+        panic(err)
     }
-//     database.UpdateDB(bucketName, []byte(data[3]), buf.Bytes())
-    h.s.RaftSet(data[3], buf.Bytes())
-    return formatter.Integer(len(dataObj["data"].(string)))
+    h.s.RaftSet(data[3], do)
+    return formatter.Integer(len(dataObj.Data))
 
 }
 
@@ -300,17 +303,19 @@ func (h *ProtoHandler) Get(data []string, bucketName []byte) string {
 
     resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
     resLen := len(resultObj)
+//     log.Printf("resultObj: %v", string(resultObj))
 
     if resLen == 0 {
 //         log.Printf("returning because reLen == 0")
         return "$-1\r\n"
     } else {
-        buf := bytes.NewBuffer(resultObj)
-        dec := gob.NewDecoder(buf)
-        m := make(map[string]interface{})
-        if err := dec.Decode(&m); err != nil {
-            log.Fatal(err)
+
+        var m dataStore
+        err := msgpack.Unmarshal(resultObj, &m)
+        if err != nil {
+            panic(err)
         }
+
 
 //         exp := m["EXP"].(int64)
 //         if exp != 0 {
@@ -320,20 +325,19 @@ func (h *ProtoHandler) Get(data []string, bucketName []byte) string {
 //             }
 //         }
 
-
-        result, _ := helpers.FindInterface(m,"data")
-        if _, ok := result.(string); !ok {
+        result := m.Data
+        if m.Type != "$" {
             message := "-ERR WRONGTYPE Operation against a key holding the wrong kind of value"
             return formatter.BulkString(message)
         }
+
         return formatter.BulkString(fmt.Sprintf("%v", result))
     }
 }
 
-
 func (h *ProtoHandler) Hget(data []string, bucketName []byte) string {
     argobj := procArgs(data)
-    gob.Register(map[string]string{})
+//     gob.Register(map[string]string{})
 
     resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
     resLen := len(resultObj)
@@ -342,24 +346,31 @@ func (h *ProtoHandler) Hget(data []string, bucketName []byte) string {
 //         log.Printf("returning because reLen == 0")
         return "$-1\r\n"
     } else {
-        buf := bytes.NewBuffer(resultObj)
-        dec := gob.NewDecoder(buf)
-        m := make(map[string]interface{})
-        if err := dec.Decode(&m); err != nil {
-            log.Fatal(err)
+//         buf := bytes.NewBuffer(resultObj)
+//         dec := gob.NewDecoder(buf)
+//         m := make(map[string]interface{})
+//         if err := dec.Decode(&m); err != nil {
+//             log.Fatal(err)
+//         }
+        var m dataStoreJson
+        err := msgpack.Unmarshal(resultObj, &m)
+        if err != nil {
+            panic(err)
         }
 
-        if m["type"] != "hash" {
+//         if m["type"] != "hash" {
+        if m.Type != "hash" {
             message := "-ERR WRONGTYPE Operation against a key holding the wrong kind of value"
             return formatter.BulkString(message)
         }
-        result, _ := helpers.FindInterface(m,"data")
-        mobj, _ := result.(map[string]string)
+//         result, _ := helpers.FindInterface(m,"data")
+//         mobj, _ := result.(map[string]string)
+        mobj := m.Data
         val, found := mobj[argobj.args[1]]
 
-        log.Printf("This is result: %v", result)
+//         log.Printf("This is result: %v", result)
         if found {
-            log.Printf("This is found: %v", val)
+//             log.Printf("This is found: %v", val)
             return formatter.BulkString(fmt.Sprintf("%v", val))
         }
         return "$-1\r\n"
@@ -367,26 +378,26 @@ func (h *ProtoHandler) Hget(data []string, bucketName []byte) string {
 }
 
 func (h *ProtoHandler) Hset(data []string, bucketName []byte) string {
-    log.Printf("Doing Hset")
+//     log.Printf("Doing Hset")
     if h.s.Raft.State() != raft.Leader {
         return h.forwardToLeader(data)
     }
 
-    gob.Register(map[string]string{})
+
     timeStamp := time.Now().UnixNano() / int64(time.Millisecond)
 
     //     setup a data container
     var exp int64
     exp = 0
-    dataObj := map[string]interface{}{
-        "created": timeStamp,
-        "EXP": exp,
-        "type": "hash",
-        "data": map[string]string{},
-    }
+
+    dataObj := &dataStoreJson{
+        created: timeStamp,
+        EXP: exp,
+        Type: "hash",
+        Data: map[string]string{}}
 
     argobj := procArgs(data)
-    log.Printf("argobj: ", argobj)
+//     log.Printf("argobj: ", argobj)
     d := make(map[string]string)
     c := 0
     for i:=1; i<len(argobj.args); i = i+2 {
@@ -395,15 +406,14 @@ func (h *ProtoHandler) Hset(data []string, bucketName []byte) string {
             c += 1
         }
     }
-    dataObj["data"] = d
-    log.Printf("datObj: ", dataObj)
+//     dataObj["data"] = d
+    dataObj.Data = d
 
-    var buf bytes.Buffer
-    enc := gob.NewEncoder(&buf)
-    if err := enc.Encode(dataObj); err != nil {
-        log.Fatal(err)
+    do, err := msgpack.Marshal(&dataObj)
+    if err != nil {
+        panic(err)
     }
-    h.s.RaftSet(data[3], buf.Bytes())
+    h.s.RaftSet(data[3], do)
 
     return formatter.Integer(c)
 }
@@ -445,12 +455,11 @@ func (h *ProtoHandler) Set(data []string, bucketName []byte) string {
 //     setup a data container
     var exp int64
     exp = 0
-    dataObj := map[string]interface{}{
-        "created": timeStamp,
-        "EXP": exp,
-        "type": "$",
-        "data": "",
-    }
+    dataObj := &dataStore{
+        created: timeStamp,
+        EXP: exp,
+        Type: "$",
+        Data: ""}
 
 //     check if the key exists. save to tmp var
 //     oldData, found := db[data[3]]
@@ -505,22 +514,23 @@ func (h *ProtoHandler) Set(data []string, bucketName []byte) string {
 //
 //         }
 
-        dataObj["EXP"] = exp
+        dataObj.EXP = exp
     } else if len(data) == 6 {
-//         log.Printf("this is good %v", len(data))
         _ = dataObj
     }else {
         return "-ERR syntax error\r\n"
     }
 
-    dataObj["data"] = data[5]
-    var buf bytes.Buffer
-    enc := gob.NewEncoder(&buf)
-    if err := enc.Encode(dataObj); err != nil {
-        log.Fatal(err)
+    dataObj.Data = data[5]
+
+// msgpack
+    do, err := msgpack.Marshal(&dataObj)
+    if err != nil {
+        panic(err)
     }
-//     database.UpdateDB(bucketName, []byte(data[3]), buf.Bytes())
-    h.s.RaftSet(data[3], buf.Bytes())
+    h.s.RaftSet(data[3], do)
+
+
     return "+OK\r\n"
 }
 
