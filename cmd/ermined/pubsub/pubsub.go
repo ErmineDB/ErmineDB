@@ -162,5 +162,5 @@ func Publish(data []string, client helpers.Client) {
         newChannel.Name = argobj.Args[0]
         Channels = append(Channels, newChannel)
     }
-    client.Socket.Write([]byte(formatter.Integer(count)))
+    client.Socket.Write([]byte(formatter.Integer(int64(count))))
 }

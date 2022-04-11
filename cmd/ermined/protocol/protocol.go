@@ -1,7 +1,7 @@
 package protocol
 
 import (
-//     "errorÎs"
+    "errors"
     "strings"
 //     "bytes"
     "fmt"
@@ -75,7 +75,7 @@ func procArgs(data []string) *argObj {
 }
 
 func Commands() []string {
-    commands := []string{"Append", "Command", "Config", "Dbsize", "Del", "Exists", "Get", "Hdel", "Hget", "Hgetall", "Hset", "Keys", "Ping", "Select", "Set"}
+    commands := []string{"Append", "Command", "Config", "Dbsize", "Del", "Exists", "Get", "Hexists", "Hdel", "Hget", "Hgetall", "Hincrby", "Hset", "Keys", "Ping", "Select", "Set"}
     return commands
 }
 
@@ -105,6 +105,9 @@ func Call(funcName string, params ...interface{}) string {
             hdl := params[1].(ProtoHandler)
             results = hdl.Get(params[0].([]string), []byte("bucket0"))
 //             results = Get(params[0].([]string), []byte("bucket0"))
+        case "Hexists":
+            hdl := params[1].(ProtoHandler)
+            results = hdl.Hexists(params[0].([]string), []byte("bucket0"))
         case "Hdel":
             hdl := params[1].(ProtoHandler)
             results = hdl.Hdel(params[0].([]string), []byte("bucket0"))
@@ -114,6 +117,9 @@ func Call(funcName string, params ...interface{}) string {
         case "Hgetall":
             hdl := params[1].(ProtoHandler)
             results = hdl.Hgetall(params[0].([]string), []byte("bucket0"))
+        case "Hincrby":
+            hdl := params[1].(ProtoHandler)
+            results = hdl.Hincrby(params[0].([]string), []byte("bucket0"))
         case "Hset":
             hdl := params[1].(ProtoHandler)
             results = hdl.Hset(params[0].([]string), []byte("bucket0"))
@@ -217,7 +223,7 @@ func (h *ProtoHandler) Append(data []string, bucketName []byte) string {
         panic(err)
     }
     h.s.RaftSet(data[3], do)
-    return formatter.Integer(len(dataObj.Data))
+    return formatter.Integer(int64(len(dataObj.Data)))
 
 }
 
@@ -231,7 +237,7 @@ func (h *ProtoHandler) Dbsize(data []string, bucketName []byte) string {
     keys, _ := h.s.Store.KeysOf([]byte(""), []byte("0"), n)
     count := len(keys.Keys)
 
-    return formatter.Integer(count)
+    return formatter.Integer(int64(count))
 }
 
 
@@ -259,7 +265,7 @@ func (h *ProtoHandler) Del(data []string, bucketName []byte) string {
         }
     }
 
-    return formatter.Integer(deleted)
+    return formatter.Integer(int64(deleted))
 }
 
 func (h *ProtoHandler) Exists(data []string, bucketName []byte) string {
@@ -276,7 +282,7 @@ func (h *ProtoHandler) Exists(data []string, bucketName []byte) string {
         }
     }
 
-    return formatter.Integer(found)
+    return formatter.Integer(int64(found))
 }
 
 func (h *ProtoHandler) Get(data []string, bucketName []byte) string {
@@ -321,6 +327,74 @@ func (h *ProtoHandler) Get(data []string, bucketName []byte) string {
         }
 
         return formatter.BulkString(fmt.Sprintf("%v", result))
+    }
+}
+
+
+func getHashObjOrNew(h *ProtoHandler, data []string, bucketName []byte) (error, dataStoreJson) {
+
+    argobj := procArgs(data)
+    resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
+    resLen := len(resultObj)
+
+    var dataObj dataStoreJson
+
+    if resLen == 0 {
+        timeStamp := time.Now().UnixNano() / int64(time.Millisecond)
+
+        //     setup a data container
+        var exp int64
+        exp = 0
+
+        dataObj.created = timeStamp
+        dataObj.EXP = exp
+        dataObj.Type = "hash"
+        dataObj.Data = map[string]string{}
+    } else {
+        err := msgpack.Unmarshal(resultObj, &dataObj)
+        if err != nil {
+            return err, dataObj
+        }
+
+        if dataObj.Type != "hash" {
+            message := errors.New("-ERR WRONGTYPE Operation against a key holding the wrong kind of value")
+            return message, dataObj
+        }
+
+        return nil, dataObj
+    }
+
+    return nil, dataObj
+}
+
+func (h *ProtoHandler) Hexists(data []string, bucketName []byte) string {
+    argobj := procArgs(data)
+
+    resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
+    resLen := len(resultObj)
+
+    if resLen == 0 {
+//         log.Printf("returning because reLen == 0")
+        return formatter.Integer(int64(0))
+    } else {
+        var m dataStoreJson
+        err := msgpack.Unmarshal(resultObj, &m)
+        if err != nil {
+            panic(err)
+        }
+
+        if m.Type != "hash" {
+            message := "-ERR WRONGTYPE Operation against a key holding the wrong kind of value"
+            return formatter.BulkString(message)
+        }
+
+        mobj := m.Data
+        _, found := mobj[argobj.args[1]]
+
+        if found {
+            return formatter.Integer(int64(1))
+        }
+        return formatter.Integer(int64(0))
     }
 }
 
@@ -372,7 +446,7 @@ func (h *ProtoHandler) Hdel(data []string, bucketName []byte) string {
         }
         h.s.RaftSet(data[3], do)
 
-        return formatter.Integer(c)
+        return formatter.Integer(int64(c))
     }
 }
 
@@ -401,9 +475,7 @@ func (h *ProtoHandler) Hget(data []string, bucketName []byte) string {
         mobj := m.Data
         val, found := mobj[argobj.args[1]]
 
-//         log.Printf("This is result: %v", result)
         if found {
-//             log.Printf("This is found: %v", val)
             return formatter.BulkString(fmt.Sprintf("%v", val))
         }
         return "$-1\r\n"
@@ -442,42 +514,62 @@ func (h *ProtoHandler) Hgetall(data []string, bucketName []byte) string {
     }
 }
 
-func (h *ProtoHandler) Hset(data []string, bucketName []byte) string {
-//     log.Printf("Doing Hset")
+func (h *ProtoHandler) Hincrby(data []string, bucketName []byte) string {
     if h.s.Raft.State() != raft.Leader {
         return h.forwardToLeader(data)
     }
 
     argobj := procArgs(data)
-    resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
-    resLen := len(resultObj)
 
-    var dataObj dataStoreJson
-
-    if resLen == 0 {
-        timeStamp := time.Now().UnixNano() / int64(time.Millisecond)
-
-        //     setup a data container
-        var exp int64
-        exp = 0
-
-        dataObj.created = timeStamp
-        dataObj.EXP = exp
-        dataObj.Type = "hash"
-        dataObj.Data = map[string]string{}
-    } else {
-        err := msgpack.Unmarshal(resultObj, &dataObj)
-        if err != nil {
-            panic(err)
-        }
-
-        if dataObj.Type != "hash" {
-            message := "-ERR WRONGTYPE Operation against a key holding the wrong kind of value"
-            return formatter.BulkString(message)
-        }
+    if len(argobj.args) != 3 {
+        return formatter.BulkString("-ERR wrong number of arguments for 'HINCRBY' command")
     }
 
-//     d := make(map[string]string)
+    incrBy, err := strconv.ParseInt(argobj.args[2], 10, 64)
+    if err != nil {
+        return formatter.BulkString("-ERR value is not an integer or out of range")
+    }
+
+    err, dataObj := getHashObjOrNew(h, data, bucketName)
+    if err != nil {
+        return formatter.BulkString(err.Error())
+    }
+
+    var v int64
+    val, found := dataObj.Data[argobj.args[1]]
+    if found {
+        v, err = strconv.ParseInt(val, 10, 64)
+        if err != nil {
+            return formatter.BulkString("-ERR hash value is not an integer")
+        }
+    } else {
+        v = 0
+    }
+
+    v = v + incrBy
+    dataObj.Data[argobj.args[1]] = strconv.FormatInt(int64(v), 10)
+
+    do, err := msgpack.Marshal(&dataObj)
+    if err != nil {
+        panic(err)
+    }
+    h.s.RaftSet(data[3], do)
+
+    return formatter.Integer(v)
+}
+
+func (h *ProtoHandler) Hset(data []string, bucketName []byte) string {
+    if h.s.Raft.State() != raft.Leader {
+        return h.forwardToLeader(data)
+    }
+
+    argobj := procArgs(data)
+
+    err, dataObj := getHashObjOrNew(h, data, bucketName)
+    if err != nil {
+        return formatter.BulkString(err.Error())
+    }
+
     d := dataObj.Data
     c := 0
     for i:=1; i<len(argobj.args); i = i+2 {
@@ -486,7 +578,7 @@ func (h *ProtoHandler) Hset(data []string, bucketName []byte) string {
             c += 1
         }
     }
-//     dataObj["data"] = d
+
     dataObj.Data = d
 
     do, err := msgpack.Marshal(&dataObj)
@@ -495,7 +587,7 @@ func (h *ProtoHandler) Hset(data []string, bucketName []byte) string {
     }
     h.s.RaftSet(data[3], do)
 
-    return formatter.Integer(c)
+    return formatter.Integer(int64(c))
 }
 
 func (h *ProtoHandler) Keys(data []string, bucketName []byte) string {
