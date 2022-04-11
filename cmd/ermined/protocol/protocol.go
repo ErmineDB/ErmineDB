@@ -75,7 +75,7 @@ func procArgs(data []string) *argObj {
 }
 
 func Commands() []string {
-    commands := []string{"Append", "Command", "Config", "Dbsize", "Del", "Exists", "Get", "Hexists", "Hdel", "Hget", "Hgetall", "Hincrby", "Hincrbyfloat", "Hset", "Keys", "Ping", "Select", "Set"}
+    commands := []string{"Append", "Command", "Config", "Dbsize", "Del", "Exists", "Get", "Hexists", "Hdel", "Hget", "Hgetall", "Hincrby", "Hincrbyfloat", "Hkeys", "Hset", "Keys", "Ping", "Select", "Set"}
     return commands
 }
 
@@ -123,6 +123,9 @@ func Call(funcName string, params ...interface{}) string {
         case "Hincrbyfloat":
             hdl := params[1].(ProtoHandler)
             results = hdl.Hincrbyfloat(params[0].([]string), []byte("bucket0"))
+        case "Hkeys":
+            hdl := params[1].(ProtoHandler)
+            results = hdl.Hkeys(params[0].([]string), []byte("bucket0"))
         case "Hset":
             hdl := params[1].(ProtoHandler)
             results = hdl.Hset(params[0].([]string), []byte("bucket0"))
@@ -487,13 +490,12 @@ func (h *ProtoHandler) Hget(data []string, bucketName []byte) string {
 
 func (h *ProtoHandler) Hgetall(data []string, bucketName []byte) string {
     argobj := procArgs(data)
-//     gob.Register(map[string]string{})
 
     resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
     resLen := len(resultObj)
 
     if resLen == 0 {
-//         log.Printf("returning because reLen == 0")
+
         return "$-1\r\n"
     } else {
         var m dataStoreJson
@@ -603,6 +605,36 @@ func (h *ProtoHandler) Hincrbyfloat(data []string, bucketName []byte) string {
     h.s.RaftSet(data[3], do)
 
     return formatter.BulkString(dataObj.Data[argobj.args[1]])
+}
+
+func (h *ProtoHandler) Hkeys(data []string, bucketName []byte) string {
+    argobj := procArgs(data)
+
+    resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
+    resLen := len(resultObj)
+
+    if resLen == 0 {
+
+        return "$-1\r\n"
+    } else {
+        var m dataStoreJson
+        err := msgpack.Unmarshal(resultObj, &m)
+        if err != nil {
+            panic(err)
+        }
+
+        if m.Type != "hash" {
+            message := "-ERR WRONGTYPE Operation against a key holding the wrong kind of value"
+            return formatter.BulkString(message)
+        }
+
+        mobj := m.Data
+        var returnString []string
+        for key, _ := range mobj {
+            returnString = append(returnString, key)
+        }
+        return formatter.List(returnString)
+    }
 }
 
 func (h *ProtoHandler) Hset(data []string, bucketName []byte) string {
