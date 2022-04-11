@@ -76,7 +76,11 @@ func List(data []string) string {
     resData := "*" + strconv.Itoa(len(data)) + "\r\n"
 
     for _, k := range data {
-        resData += BulkString(k)
+        if k == "" {
+            resData += "$-1\r\n"
+        } else {
+            resData += BulkString(k)
+        }
         //need to add support for other types of data
     }
 
