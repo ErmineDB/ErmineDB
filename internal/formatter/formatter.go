@@ -30,7 +30,7 @@ func ProcArgs(data []string) *ArgObj {
     return &obj
 }
 
-func Integer(data int) string {
+func Integer(data int64) string {
     resData := ":" + strconv.FormatInt(int64(data), 10) + "\r\n"
     return resData
 }
