@@ -75,7 +75,7 @@ func procArgs(data []string) *argObj {
 }
 
 func Commands() []string {
-    commands := []string{"Append", "Command", "Config", "Dbsize", "Del", "Exists", "Get", "Hexists", "Hdel", "Hget", "Hgetall", "Hincrby", "Hset", "Keys", "Ping", "Select", "Set"}
+    commands := []string{"Append", "Command", "Config", "Dbsize", "Del", "Exists", "Get", "Hexists", "Hdel", "Hget", "Hgetall", "Hincrby", "Hincrbyfloat", "Hset", "Keys", "Ping", "Select", "Set"}
     return commands
 }
 
@@ -120,6 +120,9 @@ func Call(funcName string, params ...interface{}) string {
         case "Hincrby":
             hdl := params[1].(ProtoHandler)
             results = hdl.Hincrby(params[0].([]string), []byte("bucket0"))
+        case "Hincrbyfloat":
+            hdl := params[1].(ProtoHandler)
+            results = hdl.Hincrbyfloat(params[0].([]string), []byte("bucket0"))
         case "Hset":
             hdl := params[1].(ProtoHandler)
             results = hdl.Hset(params[0].([]string), []byte("bucket0"))
@@ -558,6 +561,50 @@ func (h *ProtoHandler) Hincrby(data []string, bucketName []byte) string {
     return formatter.Integer(v)
 }
 
+func (h *ProtoHandler) Hincrbyfloat(data []string, bucketName []byte) string {
+    if h.s.Raft.State() != raft.Leader {
+        return h.forwardToLeader(data)
+    }
+
+    argobj := procArgs(data)
+
+    if len(argobj.args) != 3 {
+        return formatter.BulkString("-ERR wrong number of arguments for 'HINCRBYFLOAT' command")
+    }
+
+    incrBy, err := strconv.ParseFloat(argobj.args[2], 64)
+    if err != nil {
+        return formatter.BulkString("-ERR value is not a valid float")
+    }
+
+    err, dataObj := getHashObjOrNew(h, data, bucketName)
+    if err != nil {
+        return formatter.BulkString(err.Error())
+    }
+
+    var v float64
+    val, found := dataObj.Data[argobj.args[1]]
+    if found {
+        v, err = strconv.ParseFloat(val, 64)
+        if err != nil {
+            return formatter.BulkString("-ERR hash value is not a float")
+        }
+    } else {
+        v = 0
+    }
+
+    v = v + incrBy
+    dataObj.Data[argobj.args[1]] = strconv.FormatFloat(v, 'f', 17, 64)
+
+    do, err := msgpack.Marshal(&dataObj)
+    if err != nil {
+        panic(err)
+    }
+    h.s.RaftSet(data[3], do)
+
+    return formatter.BulkString(dataObj.Data[argobj.args[1]])
+}
+
 func (h *ProtoHandler) Hset(data []string, bucketName []byte) string {
     if h.s.Raft.State() != raft.Leader {
         return h.forwardToLeader(data)
@@ -591,10 +638,10 @@ func (h *ProtoHandler) Hset(data []string, bucketName []byte) string {
 }
 
 func (h *ProtoHandler) Keys(data []string, bucketName []byte) string {
-//     keys := database.Keys(bucketName)
+
     var n uint16 = 65535
     keys, _ := h.s.Store.KeysOf([]byte(""), []byte("0"), n)
-    log.Printf("Keys %v", keys.Keys)
+
     var matched []string
     var g glob.Glob
     g = glob.MustCompile(data[3])
