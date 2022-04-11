@@ -75,7 +75,7 @@ func procArgs(data []string) *argObj {
 }
 
 func Commands() []string {
-    commands := []string{"Append", "Command", "Config", "Dbsize", "Del", "Exists", "Get", "Hexists", "Hdel", "Hget", "Hgetall", "Hincrby", "Hincrbyfloat", "Hkeys", "Hlen", "Hset", "Keys", "Ping", "Select", "Set"}
+    commands := []string{"Append", "Command", "Config", "Dbsize", "Del", "Exists", "Get", "Hexists", "Hdel", "Hget", "Hgetall", "Hincrby", "Hincrbyfloat", "Hkeys", "Hlen", "Hmget", "Hset", "Keys", "Ping", "Select", "Set"}
     return commands
 }
 
@@ -129,6 +129,9 @@ func Call(funcName string, params ...interface{}) string {
         case "Hlen":
             hdl := params[1].(ProtoHandler)
             results = hdl.Hlen(params[0].([]string), []byte("bucket0"))
+        case "Hmget":
+            hdl := params[1].(ProtoHandler)
+            results = hdl.Hmget(params[0].([]string), []byte("bucket0"))
         case "Hset":
             hdl := params[1].(ProtoHandler)
             results = hdl.Hset(params[0].([]string), []byte("bucket0"))
@@ -671,6 +674,51 @@ func (h *ProtoHandler) Hlen(data []string, bucketName []byte) string {
             c += 1
         }
         return formatter.Integer(c)
+    }
+}
+
+
+func (h *ProtoHandler) Hmget(data []string, bucketName []byte) string {
+    argobj := procArgs(data)
+
+    resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
+    resLen := len(resultObj)
+
+    var returnString []string
+
+    if resLen == 0 {
+
+        return formatter.List(returnString)
+    } else {
+        var m dataStoreJson
+        err := msgpack.Unmarshal(resultObj, &m)
+        if err != nil {
+            panic(err)
+        }
+
+        if m.Type != "hash" {
+            message := "-ERR WRONGTYPE Operation against a key holding the wrong kind of value"
+            return formatter.BulkString(message)
+        }
+
+        mobj := m.Data
+        var found int
+        log.Printf("mobj type %t", mobj)
+        for _,v := range argobj.args[1:] {
+            found = 0
+            for storedKey, storedValue := range mobj {
+                if storedKey == v {
+                    found = 1
+                    returnString = append(returnString, storedValue)
+                    break
+                }
+            }
+            if found != 1 {
+                returnString = append(returnString, "")
+            }
+        }
+
+        return formatter.List(returnString)
     }
 }
 
