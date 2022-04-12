@@ -42,6 +42,8 @@ HKEYS key
 
 HLEN key
 
+HRANDFIELD key [count [WITHVALUES]]
+
 HMGET key field [field...]
 
 HMSET key field value [field value...]
