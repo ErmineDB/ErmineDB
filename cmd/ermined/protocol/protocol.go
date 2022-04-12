@@ -8,6 +8,7 @@ import (
     "time"
     "strconv"
     "log"
+    "math/rand"
 //     "reflect"
 //     "encoding/gob"
 //     "encoding/json"
@@ -743,7 +744,7 @@ func (h *ProtoHandler) Hmget(data []string, bucketName []byte) string {
 
         mobj := m.Data
         var found int
-        log.Printf("mobj type %t", mobj)
+//         log.Printf("mobj type %t", mobj)
         for _,v := range argobj.args[1:] {
             found = 0
             for storedKey, storedValue := range mobj {
@@ -762,6 +763,18 @@ func (h *ProtoHandler) Hmget(data []string, bucketName []byte) string {
     }
 }
 
+func returnRand(data map[string]string) (string, string) {
+    rNum := rand.Intn(len(data))
+    c := 0
+    for k, v := range data {
+        if c == rNum {
+            return k, v
+        }
+        c += 1
+    }
+    return "", ""
+}
+
 func (h *ProtoHandler) Hrandfield(data []string, bucketName []byte) string {
     argobj, err := procArgs(data, 1)
     if err != nil {
@@ -770,25 +783,75 @@ func (h *ProtoHandler) Hrandfield(data []string, bucketName []byte) string {
 
     argLen := len(argobj.args)
 
-    if argLen <= 1 {
-        message := "-ERR wrong number of arguments for '" + argobj.command  + "' command"
-        return formatter.BulkString(message)
-    }
-
     resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
     resLen := len(resultObj)
 
-    log.Printf("args len: %v", len(argobj.args))
-
-
-
-
-
     var returnString []string
     if resLen == 0 {
-
         return formatter.List(returnString)
     } else {
+        var m dataStoreJson
+        err := msgpack.Unmarshal(resultObj, &m)
+        if err != nil {
+            panic(err)
+        }
+
+        if m.Type != "hash" {
+            message := "-ERR WRONGTYPE Operation against a key holding the wrong kind of value"
+            return formatter.BulkString(message)
+        }
+
+        mobj := m.Data
+
+        if argLen == 1 {
+            k, _ := returnRand(mobj)
+            return formatter.BulkString(k)
+        } else if argLen >= 2 {
+            withvalues := false
+            count, err := strconv.Atoi(argobj.args[1])
+            if err != nil {
+                return formatter.BulkString("-ERR value is not an integer or out of range")
+            }
+
+            if argLen == 3 {
+                if strings.ToLower(argobj.args[2]) != "withvalues" {
+                    message := "-ERR syntax error"
+                    return formatter.BulkString(message)
+                }
+                withvalues = true
+            } else if argLen > 3 {
+                message := "-ERR syntax error"
+                return formatter.BulkString(message)
+            }
+
+            if count > 0 {
+                c := 0
+
+                for k, v := range mobj {
+                    if c < len(mobj) && c < count {
+                        returnString = append(returnString, k)
+                        if withvalues {
+                            returnString = append(returnString, v)
+                        }
+                    }
+                    c +=1
+                }
+            } else {
+                c := 0
+                count = count * -1
+                for i := 0; i < count; i++ {
+                    k, v := returnRand(mobj)
+                    if c < len(mobj) && c < count {
+                        returnString = append(returnString, k)
+                        if withvalues {
+                            returnString = append(returnString, v)
+                        }
+                    }
+                    c +=1
+                }
+            }
+            return formatter.List(returnString)
+        }
         return formatter.List(returnString)
     }
 }
