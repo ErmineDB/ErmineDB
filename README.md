@@ -42,14 +42,16 @@ HKEYS key
 
 HLEN key
 
-HRANDFIELD key [count [WITHVALUES]]
-
 HMGET key field [field...]
 
 HMSET key field value [field value...]
 This is the same as HSET
 
+HRANDFIELD key [count [WITHVALUES]]
+
 HSET key field value [field value...]
+
+HSETNX key field value
 
 ## Pub/Sub
 PUBLISH channel message
