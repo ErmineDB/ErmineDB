@@ -7,11 +7,13 @@ import (
     "fmt"
     "time"
     "strconv"
+//     "sync"
     "log"
     "math/rand"
 //     "reflect"
 //     "encoding/gob"
 //     "encoding/json"
+//     "github.com/google/uuid"
     "github.com/shamaton/msgpack/v2"
     "github.com/gobwas/glob"
     "github.com/ErmineDB/ErmineDB/cmd/ermined/eRaft"
@@ -86,82 +88,86 @@ func Commands() []string {
     return commands
 }
 
-func Call(funcName string, params ...interface{}) string {
+// func Call(funcName string, params ...interface{}) string {
+func Call(funcName string, data []string, hdl ProtoHandler, client helpers.Client) string {
     var results string
 //     log.Printf("Made it to Call")
     switch funcName {
         case "Append":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Append(params[0].([]string), []byte("bucket0"))
+//             hdl := params[1].(ProtoHandler)
+            results = hdl.Append(data, client.Db)
         case "Command":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Command(params[0].([]string))
+//             hdl := params[1].(ProtoHandler)
+            results = hdl.Command(data)
         case "Config":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Config(params[0].([]string))
+//             hdl := params[1].(ProtoHandler)
+            results = hdl.Config(data)
         case "Dbsize":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Dbsize(params[0].([]string), []byte("bucket0"))
+//             hdl := params[1].(ProtoHandler)
+            results = hdl.Dbsize(data, client.Db)
         case "Del":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Del(params[0].([]string), []byte("bucket0"))
+//             hdl := params[1].(ProtoHandler)
+            results = hdl.Del(data, client.Db)
         case "Exists":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Exists(params[0].([]string), []byte("bucket0"))
+//             hdl := params[1].(ProtoHandler)
+            results = hdl.Exists(data, client.Db)
         case "Get":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Get(params[0].([]string), []byte("bucket0"))
-//             results = Get(params[0].([]string), []byte("bucket0"))
+//             hdl := params[1].(ProtoHandler)
+//             client := params[2].(helpers.Client)
+            results = hdl.Get(data, client.Db)
+//             results = hdl.Get(params[0].([]string), []byte("bucket0"))
         case "Hexists":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Hexists(params[0].([]string), []byte("bucket0"))
+//             hdl := params[1].(ProtoHandler)
+            results = hdl.Hexists(data, client.Db)
         case "Hdel":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Hdel(params[0].([]string), []byte("bucket0"))
+//             hdl := params[1].(ProtoHandler)
+            results = hdl.Hdel(data, client.Db)
         case "Hget":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Hget(params[0].([]string), []byte("bucket0"))
+//             hdl := params[1].(ProtoHandler)
+            results = hdl.Hget(data, client.Db)
         case "Hgetall":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Hgetall(params[0].([]string), []byte("bucket0"))
+//             hdl := params[1].(ProtoHandler)
+            results = hdl.Hgetall(data, client.Db)
         case "Hincrby":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Hincrby(params[0].([]string), []byte("bucket0"))
+//             hdl := params[1].(ProtoHandler)
+            results = hdl.Hincrby(data, client.Db)
         case "Hincrbyfloat":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Hincrbyfloat(params[0].([]string), []byte("bucket0"))
+//             hdl := params[1].(ProtoHandler)
+            results = hdl.Hincrbyfloat(data, client.Db)
         case "Hkeys":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Hkeys(params[0].([]string), []byte("bucket0"))
+//             hdl := params[1].(ProtoHandler)
+            results = hdl.Hkeys(data, client.Db)
         case "Hlen":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Hlen(params[0].([]string), []byte("bucket0"))
+//             hdl := params[1].(ProtoHandler)
+            results = hdl.Hlen(data, client.Db)
         case "Hmget":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Hmget(params[0].([]string), []byte("bucket0"))
+//             hdl := params[1].(ProtoHandler)
+            results = hdl.Hmget(data, client.Db)
         case "Hrandfield":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Hrandfield(params[0].([]string), []byte("bucket0"))
+//             hdl := params[1].(ProtoHandler)
+            results = hdl.Hrandfield(data, client.Db)
         case "Hmset":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Hset(params[0].([]string), []byte("bucket0"))
+//             hdl := params[1].(ProtoHandler)
+            results = hdl.Hset(data, client.Db)
         case "Hset":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Hset(params[0].([]string), []byte("bucket0"))
+//             hdl := params[1].(ProtoHandler)
+            results = hdl.Hset(data, client.Db)
         case "Hsetnx":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Hsetnx(params[0].([]string), []byte("bucket0"))
+//             hdl := params[1].(ProtoHandler)
+            results = hdl.Hsetnx(data, client.Db)
         case "Keys":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Keys(params[0].([]string), []byte("bucket0"))
+//             hdl := params[1].(ProtoHandler)
+            results = hdl.Keys(data, client.Db)
         case "Ping":
-            results = Ping(params[0].([]string))
+            results = Ping(data)
         case "Select":
-            results = Select(params[0].([]string), []byte("bucket0"))
+//             client := params[2].(helpers.Client)
+//             clientManager := params[3].(map[uuid.UUID]helpers.Client)
+            results = Select(data, client)
         case "Set":
-            hdl := params[1].(ProtoHandler)
-            results = hdl.Set(params[0].([]string), []byte("bucket0"))
-//             results = Set(params[0].([]string), []byte("bucket0"))
+//             hdl := params[1].(ProtoHandler)
+//             results = hdl.Set(params[0].([]string), []byte("bucket0"))
+            results = hdl.Set(data, client.Db)
     }
 
     return results
@@ -209,7 +215,7 @@ func (h *ProtoHandler) Config(data []string) string{
     return "+OK\r\n"
 }
 
-func (h *ProtoHandler) Append(data []string, bucketName []byte) string {
+func (h *ProtoHandler) Append(data []string, bucketName string) string {
     if h.s.Raft.State() != raft.Leader {
         return h.forwardToLeader(data)
     }
@@ -229,7 +235,7 @@ func (h *ProtoHandler) Append(data []string, bucketName []byte) string {
         Data: ""}
 
 
-    resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
+    resultObj, _ := h.s.Store.GetData([]byte(bucketName + argobj.args[0]))
     resLen := len(resultObj)
 
     if resLen != 0 {
@@ -255,16 +261,16 @@ func (h *ProtoHandler) Append(data []string, bucketName []byte) string {
     if err != nil {
         panic(err)
     }
-    h.s.RaftSet(data[3], do)
+    h.s.RaftSet(bucketName + argobj.args[0], do)
     return formatter.Integer(int64(len(dataObj.Data)))
 
 }
 
-func Auth(data []string, bucketName []byte) string {
+func Auth(data []string, bucketName string) string {
     return ""
 }
 
-func (h *ProtoHandler) Dbsize(data []string, bucketName []byte) string {
+func (h *ProtoHandler) Dbsize(data []string, bucketName string) string {
 //     count := 0
     var n uint16 = 65535
     keys, _ := h.s.Store.KeysOf([]byte(""), []byte("0"), n)
@@ -274,7 +280,7 @@ func (h *ProtoHandler) Dbsize(data []string, bucketName []byte) string {
 }
 
 
-func (h *ProtoHandler) Del(data []string, bucketName []byte) string {
+func (h *ProtoHandler) Del(data []string, bucketName string) string {
     if h.s.Raft.State() != raft.Leader {
         return h.forwardToLeader(data)
     }
@@ -287,7 +293,7 @@ func (h *ProtoHandler) Del(data []string, bucketName []byte) string {
     deleted := 0
 
     for i := 3; i < len(data); i += 2 {
-        if err := h.s.RaftDelete(argobj.args[0]); err != nil {
+        if err := h.s.RaftDelete(bucketName + argobj.args[0]); err != nil {
             deleted = deleted
         } else {
             deleted += 1
@@ -297,7 +303,7 @@ func (h *ProtoHandler) Del(data []string, bucketName []byte) string {
     return formatter.Integer(int64(deleted))
 }
 
-func (h *ProtoHandler) Exists(data []string, bucketName []byte) string {
+func (h *ProtoHandler) Exists(data []string, bucketName string) string {
 //     timeStamp := time.Now().UnixNano() / int64(time.Millisecond)
     argobj, err := procArgs(data, 1)
     if err != nil {
@@ -307,7 +313,7 @@ func (h *ProtoHandler) Exists(data []string, bucketName []byte) string {
     found := 0
 
     for _,v := range argobj.args {
-        resultObj, _ := h.s.Store.GetData([]byte(v))
+        resultObj, _ := h.s.Store.GetData([]byte(bucketName + v))
         resLen := len(resultObj)
         if resLen > 0 {
             found += 1
@@ -317,7 +323,7 @@ func (h *ProtoHandler) Exists(data []string, bucketName []byte) string {
     return formatter.Integer(int64(found))
 }
 
-func (h *ProtoHandler) Get(data []string, bucketName []byte) string {
+func (h *ProtoHandler) Get(data []string, bucketName string) string {
 //     Get the value of a key.  If the key does not exist return nil.
 //     If the value stored at key is not a string, an error is returned.
 
@@ -330,7 +336,7 @@ func (h *ProtoHandler) Get(data []string, bucketName []byte) string {
         return formatter.BulkString("-ERR wrong number of argument for 'GET' command")
     }
 
-    resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
+    resultObj, _ := h.s.Store.GetData([]byte(bucketName + argobj.args[0]))
     resLen := len(resultObj)
 //     log.Printf("resultObj: %v", string(resultObj))
 
@@ -364,9 +370,9 @@ func (h *ProtoHandler) Get(data []string, bucketName []byte) string {
     }
 }
 
-func getHashObjOrNew(h *ProtoHandler, data []string, bucketName []byte) (dataStoreJson, error) {
+func getHashObjOrNew(h *ProtoHandler, data []string, bucketName string) (dataStoreJson, error) {
     argobj, _ := procArgs(data, 0)
-    resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
+    resultObj, _ := h.s.Store.GetData([]byte(bucketName + argobj.args[0]))
     resLen := len(resultObj)
 
     var dataObj dataStoreJson
@@ -399,13 +405,13 @@ func getHashObjOrNew(h *ProtoHandler, data []string, bucketName []byte) (dataSto
     return dataObj, nil
 }
 
-func (h *ProtoHandler) Hexists(data []string, bucketName []byte) string {
+func (h *ProtoHandler) Hexists(data []string, bucketName string) string {
     argobj, err := procArgs(data, 2)
     if err != nil {
         return formatter.BulkString(err.Error())
     }
 
-    resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
+    resultObj, _ := h.s.Store.GetData([]byte(bucketName + argobj.args[0]))
     resLen := len(resultObj)
 
     if resLen == 0 {
@@ -433,7 +439,7 @@ func (h *ProtoHandler) Hexists(data []string, bucketName []byte) string {
     }
 }
 
-func (h *ProtoHandler) Hdel(data []string, bucketName []byte) string {
+func (h *ProtoHandler) Hdel(data []string, bucketName string) string {
     if h.s.Raft.State() != raft.Leader {
         return h.forwardToLeader(data)
     }
@@ -443,11 +449,11 @@ func (h *ProtoHandler) Hdel(data []string, bucketName []byte) string {
         return formatter.BulkString(err.Error())
     }
 
-    resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
+    resultObj, _ := h.s.Store.GetData([]byte(bucketName + argobj.args[0]))
     resLen := len(resultObj)
 
     if resLen == 0 {
-//         log.Printf("returning because reLen == 0")
+        log.Printf("returning because reLen == 0")
         return "$-1\r\n"
     } else {
         var m dataStoreJson
@@ -468,6 +474,7 @@ func (h *ProtoHandler) Hdel(data []string, bucketName []byte) string {
             for j := 1; j < len(argobj.args); j++ {
                 _, found := mobj[argobj.args[j]]
                 if found {
+                    log.Printf("found")
                     delete(mobj, argobj.args[j])
                     c++
                     break
@@ -481,19 +488,19 @@ func (h *ProtoHandler) Hdel(data []string, bucketName []byte) string {
         if err != nil {
             panic(err)
         }
-        h.s.RaftSet(data[3], do)
+        h.s.RaftSet(bucketName + argobj.args[0], do)
 
         return formatter.Integer(int64(c))
     }
 }
 
-func (h *ProtoHandler) Hget(data []string, bucketName []byte) string {
+func (h *ProtoHandler) Hget(data []string, bucketName string) string {
     argobj, err := procArgs(data, 2)
     if err != nil {
         return formatter.BulkString(err.Error())
     }
 
-    resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
+    resultObj, _ := h.s.Store.GetData([]byte(bucketName + argobj.args[0]))
     resLen := len(resultObj)
 
     if resLen == 0 {
@@ -521,13 +528,13 @@ func (h *ProtoHandler) Hget(data []string, bucketName []byte) string {
     }
 }
 
-func (h *ProtoHandler) Hgetall(data []string, bucketName []byte) string {
+func (h *ProtoHandler) Hgetall(data []string, bucketName string) string {
     argobj, err := procArgs(data, 1)
     if err != nil {
         return formatter.BulkString(err.Error())
     }
 
-    resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
+    resultObj, _ := h.s.Store.GetData([]byte(bucketName + argobj.args[0]))
     resLen := len(resultObj)
 
     var returnString []string
@@ -557,7 +564,7 @@ func (h *ProtoHandler) Hgetall(data []string, bucketName []byte) string {
     }
 }
 
-func (h *ProtoHandler) Hincrby(data []string, bucketName []byte) string {
+func (h *ProtoHandler) Hincrby(data []string, bucketName string) string {
     if h.s.Raft.State() != raft.Leader {
         return h.forwardToLeader(data)
     }
@@ -599,12 +606,12 @@ func (h *ProtoHandler) Hincrby(data []string, bucketName []byte) string {
     if err != nil {
         panic(err)
     }
-    h.s.RaftSet(data[3], do)
+    h.s.RaftSet(bucketName + argobj.args[0], do)
 
     return formatter.Integer(v)
 }
 
-func (h *ProtoHandler) Hincrbyfloat(data []string, bucketName []byte) string {
+func (h *ProtoHandler) Hincrbyfloat(data []string, bucketName string) string {
     if h.s.Raft.State() != raft.Leader {
         return h.forwardToLeader(data)
     }
@@ -646,18 +653,18 @@ func (h *ProtoHandler) Hincrbyfloat(data []string, bucketName []byte) string {
     if err != nil {
         panic(err)
     }
-    h.s.RaftSet(data[3], do)
+    h.s.RaftSet(bucketName + argobj.args[0], do)
 
     return formatter.BulkString(dataObj.Data[argobj.args[1]])
 }
 
-func (h *ProtoHandler) Hkeys(data []string, bucketName []byte) string {
+func (h *ProtoHandler) Hkeys(data []string, bucketName string) string {
     argobj, err := procArgs(data, 1)
     if err != nil {
         return formatter.BulkString(err.Error())
     }
 
-    resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
+    resultObj, _ := h.s.Store.GetData([]byte(bucketName + argobj.args[0]))
     resLen := len(resultObj)
 
     var returnString []string
@@ -685,13 +692,13 @@ func (h *ProtoHandler) Hkeys(data []string, bucketName []byte) string {
     }
 }
 
-func (h *ProtoHandler) Hlen(data []string, bucketName []byte) string {
+func (h *ProtoHandler) Hlen(data []string, bucketName string) string {
     argobj, err := procArgs(data, 1)
     if err != nil {
         return formatter.BulkString(err.Error())
     }
 
-    resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
+    resultObj, _ := h.s.Store.GetData([]byte(bucketName + argobj.args[0]))
     resLen := len(resultObj)
 
     var returnString []string
@@ -719,13 +726,13 @@ func (h *ProtoHandler) Hlen(data []string, bucketName []byte) string {
     }
 }
 
-func (h *ProtoHandler) Hmget(data []string, bucketName []byte) string {
+func (h *ProtoHandler) Hmget(data []string, bucketName string) string {
     argobj, err := procArgs(data, 2)
     if err != nil {
         return formatter.BulkString(err.Error())
     }
 
-    resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
+    resultObj, _ := h.s.Store.GetData([]byte(bucketName + argobj.args[0]))
     resLen := len(resultObj)
 
     var returnString []string
@@ -778,7 +785,7 @@ func returnRand(data map[string]string) (string, string) {
     return "", ""
 }
 
-func (h *ProtoHandler) Hrandfield(data []string, bucketName []byte) string {
+func (h *ProtoHandler) Hrandfield(data []string, bucketName string) string {
     argobj, err := procArgs(data, 1)
     if err != nil {
         return formatter.BulkString(err.Error())
@@ -786,7 +793,7 @@ func (h *ProtoHandler) Hrandfield(data []string, bucketName []byte) string {
 
     argLen := len(argobj.args)
 
-    resultObj, _ := h.s.Store.GetData([]byte(argobj.args[0]))
+    resultObj, _ := h.s.Store.GetData([]byte(bucketName + argobj.args[0]))
     resLen := len(resultObj)
 
     var returnString []string
@@ -859,7 +866,7 @@ func (h *ProtoHandler) Hrandfield(data []string, bucketName []byte) string {
     }
 }
 
-func (h *ProtoHandler) Hset(data []string, bucketName []byte) string {
+func (h *ProtoHandler) Hset(data []string, bucketName string) string {
     if h.s.Raft.State() != raft.Leader {
         return h.forwardToLeader(data)
     }
@@ -890,12 +897,12 @@ func (h *ProtoHandler) Hset(data []string, bucketName []byte) string {
     if err != nil {
         panic(err)
     }
-    h.s.RaftSet(data[3], do)
+    h.s.RaftSet(bucketName + argobj.args[0], do)
 
     return formatter.Integer(int64(c))
 }
 
-func (h *ProtoHandler) Hsetnx(data []string, bucketName []byte) string {
+func (h *ProtoHandler) Hsetnx(data []string, bucketName string) string {
     if h.s.Raft.State() != raft.Leader {
         return h.forwardToLeader(data)
     }
@@ -921,12 +928,12 @@ func (h *ProtoHandler) Hsetnx(data []string, bucketName []byte) string {
     if err != nil {
         panic(err)
     }
-    h.s.RaftSet(argobj.args[0], do)
+    h.s.RaftSet(bucketName + argobj.args[0], do)
 
     return formatter.Integer(int64(1))
 }
 
-func (h *ProtoHandler) Keys(data []string, bucketName []byte) string {
+func (h *ProtoHandler) Keys(data []string, bucketName string) string {
     argobj, err := procArgs(data, 1)
     if err != nil {
         return formatter.BulkString(err.Error())
@@ -937,11 +944,13 @@ func (h *ProtoHandler) Keys(data []string, bucketName []byte) string {
 
     var matched []string
     var g glob.Glob
-    g = glob.MustCompile(argobj.args[0])
+//     g = glob.MustCompile(argobj.args[0])
+    g = glob.MustCompile(bucketName + argobj.args[0])
 
     for _, k := range keys.Keys {
         if g.Match(k) {
-            matched = append(matched, k)
+            key := strings.TrimPrefix(k, bucketName)
+            matched = append(matched, key)
         }
     }
     return formatter.List(matched)
@@ -956,7 +965,7 @@ func Ping(data []string) string {
 }
 
 // func Set(data []string, db map[string]interface{}) string{
-func (h *ProtoHandler) Set(data []string, bucketName []byte) string {
+func (h *ProtoHandler) Set(data []string, bucketName string) string {
     if h.s.Raft.State() != raft.Leader {
         return h.forwardToLeader(data)
     }
@@ -1044,12 +1053,28 @@ func (h *ProtoHandler) Set(data []string, bucketName []byte) string {
     if err != nil {
         panic(err)
     }
-    h.s.RaftSet(argobj.args[0], do)
+    h.s.RaftSet(bucketName + argobj.args[0], do)
 
 
     return "+OK\r\n"
 }
 
-func Select(data []string, bucketName []byte) string {
+func Select(data []string, client helpers.Client) string {
+    argobj, err := procArgs(data, 1)
+    if err != nil {
+        return formatter.BulkString(err.Error())
+    }
+
+    dbInt, err := strconv.Atoi(argobj.args[0])
+    if err != nil {
+        return formatter.BulkString("-ERR value is not an integer or out of range")
+    }
+
+    if dbInt > 15 {
+        return formatter.BulkString("ERR DB index is out of range")
+    }
+
+    client.Db = "bucket" + argobj.args[0]
+    helpers.ClientManager[client.Uuid] = client
     return "+OK\r\n"
 }
