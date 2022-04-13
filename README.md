@@ -18,6 +18,8 @@ cluster replication using Raft just to name two.
 PING [message]
 Returns `PONG` if no message is provided, otherwise a copy of the message is returned.
 
+SELECT index
+
 ## Generic
 DEL key [key...]
 

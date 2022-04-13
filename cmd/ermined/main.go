@@ -7,6 +7,7 @@ import (
     "os"
     "net"
     "strings"
+//     "sync"
     "io/ioutil"
     "github.com/ErmineDB/ErmineDB/internal/helpers"
     "github.com/ErmineDB/ErmineDB/cmd/ermined/protocol"
@@ -30,6 +31,7 @@ var (
     log     = hclog.New(&hclog.LoggerOptions{Name: "erminedb"})
 )
 
+// var ClientManager sync.Map
 // func init() {
 //     database.OpenDB()
 
@@ -75,9 +77,11 @@ func main() {
         }
 //         log.Info("New connection")
         id := uuid.New()
-        client := helpers.Client{Socket: conn, Uuid: id}
+        client := helpers.Client{Socket: conn, Uuid: id, Db: "bucket0"}
 
-        helpers.Manager.Store(id, client)
+//         helpers.Manager.Store(id, client)
+//         ClientManager.Store(client.Uuid, client)
+        helpers.ClientManager[id] = client
 
         go handleConn(conn, client, *hdl)
     }
@@ -86,7 +90,9 @@ func main() {
 
 func handleConn(conn net.Conn, client helpers.Client, hdl protocol.ProtoHandler) {
     defer conn.Close()
-    helpers.Manager.Delete(client.Uuid)
+//     helpers.Manager.Delete(client.Uuid)
+//     defer ClientManager.Delete(client.Uuid)
+    defer delete(helpers.ClientManager, client.Uuid)
 
     for {
         reader := bufio.NewReaderSize(conn, 4096)
@@ -117,7 +123,12 @@ func handleConn(conn net.Conn, client helpers.Client, hdl protocol.ProtoHandler)
                 commandRequested :=  strings.ToLower(splitData[1])
                 commandRequested =  strings.Title(commandRequested)
                 if helpers.Contains(protocol.Commands(), commandRequested) {
-                    resData := protocol.Call(commandRequested, splitData, hdl)
+                    log.Info("ClientManager in main", "ClientManager", helpers.ClientManager)
+//                     var cDB helpers.Client
+                    log.Info("client.Uuid", "client.Uuid", client.Uuid)
+                    cDB := helpers.ClientManager[client.Uuid]
+                    log.Info("DB in main", "cDB", cDB.Db)
+                    resData := protocol.Call(commandRequested, splitData, hdl, cDB)
                     client.Socket.Write([]byte(resData))
                 } else if helpers.Contains(pubsub.Commands(), commandRequested) {
                     pubsub.Call(commandRequested, client, splitData)

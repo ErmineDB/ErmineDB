@@ -10,14 +10,18 @@ import (
 )
 
 type Client struct {
-    Socket net.Conn
-    Uuid uuid.UUID
-    Subs []string
+    Db      string
+    Socket  net.Conn
+    Subs    []string
+    Uuid    uuid.UUID
 }
 
 // var Mutex = &sync.Mutex{}
 // var Manager = make(map[uuid.UUID]Client)
 var Manager = sync.Map{}
+var (
+    ClientManager = make(map[uuid.UUID]Client)
+)
 
 type Channel struct {
     Name string
