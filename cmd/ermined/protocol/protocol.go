@@ -82,7 +82,7 @@ func procArgs(data []string, minArgs int) (*argObj, error) {
 }
 
 func Commands() []string {
-    commands := []string{"Append", "Command", "Config", "Dbsize", "Del", "Exists", "Get", "Hexists", "Hdel", "Hget", "Hgetall", "Hincrby", "Hincrbyfloat", "Hkeys", "Hlen", "Hmget", "Hrandfield", "Hmset", "Hset", "Keys", "Ping", "Select", "Set"}
+    commands := []string{"Append", "Command", "Config", "Dbsize", "Del", "Exists", "Get", "Hexists", "Hdel", "Hget", "Hgetall", "Hincrby", "Hincrbyfloat", "Hkeys", "Hlen", "Hmget", "Hmset", "Hrandfield", "Hset", "Hsetnx", "Keys", "Ping", "Select", "Set"}
     return commands
 }
 
@@ -148,6 +148,9 @@ func Call(funcName string, params ...interface{}) string {
         case "Hset":
             hdl := params[1].(ProtoHandler)
             results = hdl.Hset(params[0].([]string), []byte("bucket0"))
+        case "Hsetnx":
+            hdl := params[1].(ProtoHandler)
+            results = hdl.Hsetnx(params[0].([]string), []byte("bucket0"))
         case "Keys":
             hdl := params[1].(ProtoHandler)
             results = hdl.Keys(params[0].([]string), []byte("bucket0"))
@@ -871,16 +874,17 @@ func (h *ProtoHandler) Hset(data []string, bucketName []byte) string {
         return formatter.BulkString(err.Error())
     }
 
-    d := dataObj.Data
+//     d := dataObj.Data
     c := 0
     for i:=1; i<len(argobj.args); i = i+2 {
         if i+1 < len(argobj.args) {
-            d[argobj.args[i]] = argobj.args[i+1]
+//             d[argobj.args[i]] = argobj.args[i+1]
+            dataObj.Data[argobj.args[i]] = argobj.args[i+1]
             c += 1
         }
     }
 
-    dataObj.Data = d
+//     dataObj.Data = d
 
     do, err := msgpack.Marshal(&dataObj)
     if err != nil {
@@ -889,6 +893,37 @@ func (h *ProtoHandler) Hset(data []string, bucketName []byte) string {
     h.s.RaftSet(data[3], do)
 
     return formatter.Integer(int64(c))
+}
+
+func (h *ProtoHandler) Hsetnx(data []string, bucketName []byte) string {
+    if h.s.Raft.State() != raft.Leader {
+        return h.forwardToLeader(data)
+    }
+
+    argobj, err := procArgs(data, 3)
+    if err != nil {
+        return formatter.BulkString(err.Error())
+    }
+
+    dataObj, err := getHashObjOrNew(h, data, bucketName)
+    if err != nil {
+        return formatter.BulkString(err.Error())
+    }
+
+    found := dataObj.Data[argobj.args[1]]
+    if found != "" {
+        return formatter.Integer(int64(0))
+    } else {
+        dataObj.Data[argobj.args[1]] = argobj.args[2]
+    }
+
+    do, err := msgpack.Marshal(&dataObj)
+    if err != nil {
+        panic(err)
+    }
+    h.s.RaftSet(argobj.args[0], do)
+
+    return formatter.Integer(int64(1))
 }
 
 func (h *ProtoHandler) Keys(data []string, bucketName []byte) string {
