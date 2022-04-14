@@ -23,6 +23,8 @@ import (
 
 //     "github.com/dgraph-io/badger/v3"
     "github.com/hashicorp/raft"
+//     "github.com/rs/zerolog"
+//     "github.com/rs/zerolog/log"
 )
 
 type ProtoHandler struct {
