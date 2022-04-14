@@ -19,6 +19,8 @@ PING [message]
 Returns `PONG` if no message is provided, otherwise a copy of the message is returned.
 
 SELECT index
+Select an index from 0 - 15. By default connections use index 0. Different indexes are still part of the same database/file, but they are prefixed. This is a type of namespacing. Keys in defferent indexes can have the same name without conflict.
+Unlike Redis, all indexes are replicated to the other nodes in the Raft cluster.
 
 ## Generic
 DEL key [key...]

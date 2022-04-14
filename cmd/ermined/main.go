@@ -3,11 +3,11 @@ package main
 import (
     "bufio"
     "flag"
-//     "log"
+//     logd "log"
     "os"
     "net"
     "strings"
-//     "sync"
+    "sync"
     "io/ioutil"
     "github.com/ErmineDB/ErmineDB/internal/helpers"
     "github.com/ErmineDB/ErmineDB/cmd/ermined/protocol"
@@ -16,6 +16,8 @@ import (
     "github.com/ErmineDB/ErmineDB/cmd/ermined/eRaft"
     "github.com/google/uuid"
     "github.com/hashicorp/go-hclog"
+//     "github.com/rs/zerolog"
+//     "github.com/rs/zerolog/log"
 )
 
 const (
@@ -28,14 +30,13 @@ var (
     raftPort = flag.String("raftPort", "12001", "Raft listen port")
     dataDir = flag.String("data", "./data", "Data storage directory")
     join = flag.String("join", "127.0.0.1:12001:8888", "Comma-separated list of host:raftPort:RedisPort cluster nodes")
-    log     = hclog.New(&hclog.LoggerOptions{Name: "erminedb"})
+    log     = hclog.New(&hclog.LoggerOptions{
+        Name: "erminedb",
+        Level: hclog.LevelFromString("DEBUG"),
+    })
+    lock = sync.RWMutex{}
 )
 
-// var ClientManager sync.Map
-// func init() {
-//     database.OpenDB()
-
-// }
 
 func main() {
     if _, trace := os.LookupEnv("ERMINE_TRACE"); trace {
@@ -43,10 +44,13 @@ func main() {
     } else if _, debug := os.LookupEnv("ERMINE_TRACE"); debug {
         log.SetLevel(hclog.Debug)
     }
+//     zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
-    log.Info("", "version", version)
+//     log.Info().
+//         Msg("version: " + version)
     splash, _ := ioutil.ReadFile("./cmd/ermined/ascii-art.txt")
     log.Info(string(splash))
+//     logd.Println(string(splash))
 
     flag.Parse()
 
@@ -55,6 +59,7 @@ func main() {
     srv := eRaft.NewServer(*dataDir, addrRedisportRaftPort, strings.Split(*join, ","))
     if err := srv.Start(); err != nil {
         log.Error("failed to start server", "peerId", addrRedisportRaftPort, "error", err)
+//         log.Error().Err(err)
     }
 
 
@@ -64,6 +69,7 @@ func main() {
     redisServer, err := net.Listen("tcp", addrPort)
     if err != nil {
         log.Error("There was an error: ", "error", err)
+//         log.Error().Err(err)
     }
     defer redisServer.Close()
 
@@ -73,15 +79,20 @@ func main() {
         conn, err := redisServer.Accept()
         if err != nil {
             log.Error("Failed to accept conn.", "error", err)
+//             log.Error().Err(err)
             continue
         }
-//         log.Info("New connection")
+//         log.Info("New connection", "conn", conn)
+//         if addr, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
+//             log.Info().
+//                 Str("New connection", addr.String()).Send()
+//         }
         id := uuid.New()
         client := helpers.Client{Socket: conn, Uuid: id, Db: "bucket0"}
 
-//         helpers.Manager.Store(id, client)
-//         ClientManager.Store(client.Uuid, client)
+        lock.Lock()
         helpers.ClientManager[id] = client
+        lock.Unlock()
 
         go handleConn(conn, client, *hdl)
     }
@@ -90,9 +101,9 @@ func main() {
 
 func handleConn(conn net.Conn, client helpers.Client, hdl protocol.ProtoHandler) {
     defer conn.Close()
-//     helpers.Manager.Delete(client.Uuid)
-//     defer ClientManager.Delete(client.Uuid)
+    defer lock.Unlock()
     defer delete(helpers.ClientManager, client.Uuid)
+    defer lock.Lock()
 
     for {
         reader := bufio.NewReaderSize(conn, 4096)
@@ -104,30 +115,24 @@ func handleConn(conn net.Conn, client helpers.Client, hdl protocol.ProtoHandler)
         var byteSize = reader.Buffered()
 
         if err != nil {
-//             log.Error("There was an error.", "error", err)
             break
         }
-//         log.Info("data: %v", string(data[:]))
-//         log.Info("size: %v", byteSize)
 
         data = make([]byte, byteSize)
         reader.Read(data)
-//         log.Info("data: ", "data", string(data[:]))
 
         dataString := string(data[:])
         if len(dataString) > 0 {
             splitData := helpers.Parsedata(string(data[:]))
-//             connection.ProcessCommand(splitData, client, hdl)
             if len(splitData) > 1 {
-//                 log.Info("SplitData is > 1")
                 commandRequested :=  strings.ToLower(splitData[1])
                 commandRequested =  strings.Title(commandRequested)
                 if helpers.Contains(protocol.Commands(), commandRequested) {
-                    log.Info("ClientManager in main", "ClientManager", helpers.ClientManager)
-//                     var cDB helpers.Client
-                    log.Info("client.Uuid", "client.Uuid", client.Uuid)
+//                     log.Info().
+//                         Str("command", string(data)).Send()
+                    lock.Lock()
                     cDB := helpers.ClientManager[client.Uuid]
-                    log.Info("DB in main", "cDB", cDB.Db)
+                    lock.Unlock()
                     resData := protocol.Call(commandRequested, splitData, hdl, cDB)
                     client.Socket.Write([]byte(resData))
                 } else if helpers.Contains(pubsub.Commands(), commandRequested) {
