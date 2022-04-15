@@ -16,8 +16,8 @@ import (
     "github.com/ErmineDB/ErmineDB/cmd/ermined/eRaft"
     "github.com/google/uuid"
     "github.com/hashicorp/go-hclog"
-//     "github.com/rs/zerolog"
-//     "github.com/rs/zerolog/log"
+    "github.com/rs/zerolog"
+    zlog "github.com/rs/zerolog/log"
 )
 
 const (
@@ -44,7 +44,7 @@ func main() {
     } else if _, debug := os.LookupEnv("ERMINE_TRACE"); debug {
         log.SetLevel(hclog.Debug)
     }
-//     zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+    zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
 //     log.Info().
 //         Msg("version: " + version)
@@ -83,12 +83,14 @@ func main() {
             continue
         }
 //         log.Info("New connection", "conn", conn)
-//         if addr, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
-//             log.Info().
-//                 Str("New connection", addr.String()).Send()
-//         }
+        var remoteAddr string
+        if addr, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
+            remoteAddr = addr.String()
+            zlog.Info().
+                Str("New connection", addr.String()).Send()
+        }
         id := uuid.New()
-        client := helpers.Client{Socket: conn, Uuid: id, Db: "bucket0"}
+        client := helpers.Client{Socket: conn, SessionId: id, Db: "bucket0", Addr: remoteAddr}
 
         lock.Lock()
         helpers.ClientManager[id] = client
@@ -102,7 +104,7 @@ func main() {
 func handleConn(conn net.Conn, client helpers.Client, hdl protocol.ProtoHandler) {
     defer conn.Close()
     defer lock.Unlock()
-    defer delete(helpers.ClientManager, client.Uuid)
+    defer delete(helpers.ClientManager, client.SessionId)
     defer lock.Lock()
 
     for {
@@ -127,15 +129,17 @@ func handleConn(conn net.Conn, client helpers.Client, hdl protocol.ProtoHandler)
             if len(splitData) > 1 {
                 commandRequested :=  strings.ToLower(splitData[1])
                 commandRequested =  strings.Title(commandRequested)
-                if helpers.Contains(protocol.Commands(), commandRequested) {
-//                     log.Info().
-//                         Str("command", string(data)).Send()
+                if helpers.Contains(protocol.Commands(), commandRequested, false) {
+                    zlog.Info().
+                        Str("command", string(data)).
+                        Str("user", client.User).
+                        Str("remoteAddr", client.Addr).Send()
                     lock.Lock()
-                    cDB := helpers.ClientManager[client.Uuid]
+                    cDB := helpers.ClientManager[client.SessionId]
                     lock.Unlock()
                     resData := protocol.Call(commandRequested, splitData, hdl, cDB)
                     client.Socket.Write([]byte(resData))
-                } else if helpers.Contains(pubsub.Commands(), commandRequested) {
+                } else if helpers.Contains(pubsub.Commands(), commandRequested, false) {
                     pubsub.Call(commandRequested, client, splitData)
                 } else {
                     client.Socket.Write([]byte("$-1\r\n"))

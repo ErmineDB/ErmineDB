@@ -10,10 +10,12 @@ import (
 )
 
 type Client struct {
-    Db      string
-    Socket  net.Conn
-    Subs    []string
-    Uuid    uuid.UUID
+    Db          string
+    Addr        string
+    Socket      net.Conn
+    Subs        []string
+    User        string
+    SessionId   uuid.UUID
 }
 
 // var Mutex = &sync.Mutex{}
@@ -44,7 +46,7 @@ func Parsedata(data string) []string {
     }
 
     dataC1 := string([]rune(data)[0])
-    if Contains(dataTypes, dataC1) {
+    if Contains(dataTypes, dataC1, false) {
         // This must be a single command
         splitData = strings.Split(data[4:], "\r\n")
         if splitData[len(splitData) - 1] == "" {
@@ -60,10 +62,18 @@ func Parsedata(data string) []string {
 }
 
 // returns true or false if str is in array s
-func Contains(s []string, str string) bool {
-    for _, v := range s {
-        if v == str {
-            return true
+func Contains(s []string, str string, ignoreCase bool) bool {
+    if ignoreCase {
+        for _, v := range s {
+            if strings.ToLower(v) == strings.ToLower(str) {
+                return true
+            }
+        }
+    }else {
+        for _, v := range s {
+            if v == str {
+                return true
+            }
         }
     }
     return false

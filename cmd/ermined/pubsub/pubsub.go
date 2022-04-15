@@ -54,7 +54,7 @@ func RemoveFromChannel(client helpers.Client, channelName string) bool{
         if c.Name == channelName {
             i := 0
             for cl := range c.Clients {
-                if c.Clients[cl].Uuid == client.Uuid {
+                if c.Clients[cl].SessionId == client.SessionId {
                     c.Clients[i] = c.Clients[len(c.Clients)-1]
                     c.Clients = c.Clients[:len(c.Clients)-1]
                     return true
@@ -95,7 +95,7 @@ func Subscribe(data []string, client helpers.Client) {
 
             // update client with new sub, then update the Manager with client
             client.Subs = append(client.Subs, k)
-            helpers.Manager.Store(client.Uuid, client)
+            helpers.Manager.Store(client.SessionId, client)
 
             // load existing channel and add client
             // then update Channels
@@ -112,7 +112,7 @@ func Subscribe(data []string, client helpers.Client) {
 
             // update client with new sub, then update the Manager with client
             client.Subs = append(client.Subs, k)
-            helpers.Manager.Store(client.Uuid, client)
+            helpers.Manager.Store(client.SessionId, client)
 
             newChannel.Clients = append(newChannel.Clients, client)
 
