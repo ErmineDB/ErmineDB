@@ -23,6 +23,8 @@ Select an index from 0 - 15. By default connections use index 0. Different index
 Unlike Redis, all indexes are replicated to the other nodes in the Raft cluster.
 
 ## Generic
+COPY source destination [DB destination-index] [REPLACE]
+
 DEL key [key...]
 
 EXISTS key [key...]

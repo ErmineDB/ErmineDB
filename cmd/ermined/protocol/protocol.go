@@ -86,7 +86,7 @@ func procArgs(data []string, minArgs int) (*argObj, error) {
 }
 
 func Commands() []string {
-    commands := []string{"Append", "Command", "Config", "Dbsize", "Del", "Exists", "Get", "Hexists", "Hdel", "Hget", "Hgetall", "Hincrby", "Hincrbyfloat", "Hkeys", "Hlen", "Hmget", "Hmset", "Hrandfield", "Hset", "Hsetnx", "Keys", "Ping", "Select", "Set"}
+    commands := []string{"Append", "Command", "Config", "Copy", "Dbsize", "Del", "Exists", "Get", "Hexists", "Hdel", "Hget", "Hgetall", "Hincrby", "Hincrbyfloat", "Hkeys", "Hlen", "Hmget", "Hmset", "Hrandfield", "Hset", "Hsetnx", "Keys", "Ping", "Select", "Set"}
     return commands
 }
 
@@ -96,79 +96,54 @@ func Call(funcName string, data []string, hdl ProtoHandler, client helpers.Clien
 //     log.Printf("Made it to Call")
     switch funcName {
         case "Append":
-//             hdl := params[1].(ProtoHandler)
             results = hdl.Append(data, client.Db)
         case "Command":
-//             hdl := params[1].(ProtoHandler)
             results = hdl.Command(data)
         case "Config":
-//             hdl := params[1].(ProtoHandler)
             results = hdl.Config(data)
+        case "Copy":
+            results = hdl.Copy(data, client.Db)
         case "Dbsize":
-//             hdl := params[1].(ProtoHandler)
             results = hdl.Dbsize(data, client.Db)
         case "Del":
-//             hdl := params[1].(ProtoHandler)
             results = hdl.Del(data, client.Db)
         case "Exists":
-//             hdl := params[1].(ProtoHandler)
             results = hdl.Exists(data, client.Db)
         case "Get":
-//             hdl := params[1].(ProtoHandler)
-//             client := params[2].(helpers.Client)
             results = hdl.Get(data, client.Db)
-//             results = hdl.Get(params[0].([]string), []byte("bucket0"))
         case "Hexists":
-//             hdl := params[1].(ProtoHandler)
             results = hdl.Hexists(data, client.Db)
         case "Hdel":
-//             hdl := params[1].(ProtoHandler)
             results = hdl.Hdel(data, client.Db)
         case "Hget":
-//             hdl := params[1].(ProtoHandler)
             results = hdl.Hget(data, client.Db)
         case "Hgetall":
-//             hdl := params[1].(ProtoHandler)
             results = hdl.Hgetall(data, client.Db)
         case "Hincrby":
-//             hdl := params[1].(ProtoHandler)
             results = hdl.Hincrby(data, client.Db)
         case "Hincrbyfloat":
-//             hdl := params[1].(ProtoHandler)
             results = hdl.Hincrbyfloat(data, client.Db)
         case "Hkeys":
-//             hdl := params[1].(ProtoHandler)
             results = hdl.Hkeys(data, client.Db)
         case "Hlen":
-//             hdl := params[1].(ProtoHandler)
             results = hdl.Hlen(data, client.Db)
         case "Hmget":
-//             hdl := params[1].(ProtoHandler)
             results = hdl.Hmget(data, client.Db)
         case "Hrandfield":
-//             hdl := params[1].(ProtoHandler)
             results = hdl.Hrandfield(data, client.Db)
         case "Hmset":
-//             hdl := params[1].(ProtoHandler)
             results = hdl.Hset(data, client.Db)
         case "Hset":
-//             hdl := params[1].(ProtoHandler)
             results = hdl.Hset(data, client.Db)
         case "Hsetnx":
-//             hdl := params[1].(ProtoHandler)
             results = hdl.Hsetnx(data, client.Db)
         case "Keys":
-//             hdl := params[1].(ProtoHandler)
             results = hdl.Keys(data, client.Db)
         case "Ping":
             results = Ping(data)
         case "Select":
-//             client := params[2].(helpers.Client)
-//             clientManager := params[3].(map[uuid.UUID]helpers.Client)
             results = Select(data, client)
         case "Set":
-//             hdl := params[1].(ProtoHandler)
-//             results = hdl.Set(params[0].([]string), []byte("bucket0"))
             results = hdl.Set(data, client.Db)
     }
 
@@ -206,16 +181,6 @@ func (h *ProtoHandler) forwardToLeader(data []string) string {
 /* =========================
       Protocol Functions
 ========================= */
-
-func (h *ProtoHandler) Command(data []string) string{
-//     log.Printf("Command data %v", data)
-//     return "*1\r\n*6\r\nget\r\n:2\r\n*1\r\n$8\r\nreadonly\r\n1\r\n1\r\n1\r\n"
-    return "+OK\r\n"
-}
-
-func (h *ProtoHandler) Config(data []string) string{
-    return "+OK\r\n"
-}
 
 func (h *ProtoHandler) Append(data []string, bucketName string) string {
     if h.s.Raft.State() != raft.Leader {
@@ -270,6 +235,54 @@ func (h *ProtoHandler) Append(data []string, bucketName string) string {
 
 func Auth(data []string, bucketName string) string {
     return ""
+}
+
+func (h *ProtoHandler) Command(data []string) string{
+//     log.Printf("Command data %v", data)
+//     return "*1\r\n*6\r\nget\r\n:2\r\n*1\r\n$8\r\nreadonly\r\n1\r\n1\r\n1\r\n"
+    return "+OK\r\n"
+}
+
+func (h *ProtoHandler) Config(data []string) string{
+    return "+OK\r\n"
+}
+
+func (h *ProtoHandler) Copy(data []string, bucketName string) string {
+    if h.s.Raft.State() != raft.Leader {
+        return h.forwardToLeader(data)
+    }
+
+    argobj, err := procArgs(data, 2)
+    if err != nil {
+        return formatter.BulkString(err.Error())
+    }
+
+    useNewDb := helpers.Contains(argobj.args, "db", true)
+    var destinationDb string
+    if useNewDb {
+        destinationDb = "bucket" + argobj.args[3]
+    } else {
+        destinationDb = bucketName
+    }
+
+    replace := helpers.Contains(argobj.args, "replace", true)
+    if replace {
+        h.s.RaftDelete(destinationDb + argobj.args[1])
+    }
+
+    replaceObj, _ := h.s.Store.GetData([]byte(destinationDb + argobj.args[1]))
+    replaceLen := len(replaceObj)
+
+    resultObj, _ := h.s.Store.GetData([]byte(bucketName + argobj.args[0]))
+    resLen := len(resultObj)
+
+    if replaceLen > 0 || resLen == 0 {
+        return formatter.Integer(int64(0))
+    } else {
+        h.s.RaftSet(destinationDb + argobj.args[1], resultObj)
+        return formatter.Integer(int64(1))
+    }
+
 }
 
 func (h *ProtoHandler) Dbsize(data []string, bucketName string) string {
@@ -998,8 +1011,8 @@ func (h *ProtoHandler) Set(data []string, bucketName string) string {
             upperData = append(upperData, v)
         }
 
-        if helpers.Contains(upperData, "EX") {
-            if helpers.Contains(upperData, "PX") || helpers.Contains(upperData, "EXAT") || helpers.Contains(upperData, "PXAT") || helpers.Contains(upperData, "KEEPTTL") {
+        if helpers.Contains(upperData, "EX", false) {
+            if helpers.Contains(upperData, "PX", false) || helpers.Contains(upperData, "EXAT", false) || helpers.Contains(upperData, "PXAT", false) || helpers.Contains(upperData, "KEEPTTL", false) {
                 return "-ERR syntax error\r\n"
             } else {
                 idx := helpers.IndexOf(upperData, "EX")
@@ -1007,8 +1020,8 @@ func (h *ProtoHandler) Set(data []string, bucketName string) string {
                 exp = (exp * 1000) + timeStamp
             }
         }
-        if helpers.Contains(upperData, "PX") {
-            if helpers.Contains(upperData, "EX") || helpers.Contains(upperData, "EXAT") || helpers.Contains(upperData, "PXAT") || helpers.Contains(upperData, "KEEPTTL") {
+        if helpers.Contains(upperData, "PX", false) {
+            if helpers.Contains(upperData, "EX", false) || helpers.Contains(upperData, "EXAT", false) || helpers.Contains(upperData, "PXAT", false) || helpers.Contains(upperData, "KEEPTTL", false) {
                 return "-ERR syntax error\r\n"
             } else {
                 idx := helpers.IndexOf(upperData, "PX")
@@ -1017,8 +1030,8 @@ func (h *ProtoHandler) Set(data []string, bucketName string) string {
                 exp = exp + timeStamp
             }
         }
-        if helpers.Contains(upperData, "EXAT") {
-            if helpers.Contains(upperData, "EX") || helpers.Contains(upperData, "PX") || helpers.Contains(upperData, "PXAT") || helpers.Contains(upperData, "KEEPTTL") {
+        if helpers.Contains(upperData, "EXAT", false) {
+            if helpers.Contains(upperData, "EX", false) || helpers.Contains(upperData, "PX", false) || helpers.Contains(upperData, "PXAT", false) || helpers.Contains(upperData, "KEEPTTL", false) {
                 return "-ERR syntax error\r\n"
             } else {
                 idx := helpers.IndexOf(upperData, "EXAT")
@@ -1027,8 +1040,8 @@ func (h *ProtoHandler) Set(data []string, bucketName string) string {
                 exp = exp * 1000
             }
         }
-        if helpers.Contains(upperData, "PXAT") {
-            if helpers.Contains(upperData, "EX") || helpers.Contains(upperData, "PX") || helpers.Contains(upperData, "EXAT") || helpers.Contains(upperData, "KEEPTTL") {
+        if helpers.Contains(upperData, "PXAT", false) {
+            if helpers.Contains(upperData, "EX", false) || helpers.Contains(upperData, "PX", false) || helpers.Contains(upperData, "EXAT", false) || helpers.Contains(upperData, "KEEPTTL", false) {
                 return "-ERR syntax error\r\n"
             } else {
                 idx := helpers.IndexOf(upperData, "PXAT")
@@ -1037,7 +1050,7 @@ func (h *ProtoHandler) Set(data []string, bucketName string) string {
                 exp = exp
             }
         }
-//         if helpers.Contains(upperData, "KEEPTTL") {
+//         if helpers.Contains(upperData, "KEEPTTL", false) {
 //
 //         }
 
@@ -1077,6 +1090,6 @@ func Select(data []string, client helpers.Client) string {
     }
 
     client.Db = "bucket" + argobj.args[0]
-    helpers.ClientManager[client.Uuid] = client
+    helpers.ClientManager[client.SessionId] = client
     return "+OK\r\n"
 }
