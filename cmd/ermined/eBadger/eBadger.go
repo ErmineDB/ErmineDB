@@ -368,6 +368,29 @@ func (b *BadgerStore) GetData(key []byte) ([]byte, error) {
 func (b *BadgerStore) Get(k []byte) ([]byte, error) {
 	return b.GetRaw(sstKeyOf(k))
 }
+// func (b *BadgerStore) Get(key []byte) ([]byte, error) {
+// 	var value []byte
+// 	err := b.Db.View(func(txn *badger.Txn) error {
+// 		item, err := txn.Get(key)
+// 		if err != nil {
+// 			switch err {
+// 			case badger.ErrKeyNotFound:
+// 				return ErrKeyNotFound
+// 			default:
+// 				return err
+// 			}
+// 		}
+// 		value, err = item.ValueCopy(value)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		return nil
+// 	})
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return value, nil
+// }
 
 // Set a key/value in StableStore.
 func (b *BadgerStore) Set(k []byte, v []byte) error {

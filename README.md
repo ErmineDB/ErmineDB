@@ -27,6 +27,9 @@ COPY source destination [DB destination-index] [REPLACE]
 
 DEL key [key...]
 
+DUMP key
+This is similer to Redis dump but they are not compatible. Where Redis uses a non-standard serialization format ErmineDB uses msgpack.
+
 EXISTS key [key...]
 
 KEYS pattern
@@ -68,6 +71,8 @@ UNSUBSCRIBE channel
 
 ## Server management
 DBSIZE
+
+TIME
 
 ## String
 APPEND key value
