@@ -86,7 +86,7 @@ func procArgs(data []string, minArgs int) (*argObj, error) {
 }
 
 func Commands() []string {
-    commands := []string{"Append", "Command", "Config", "Copy", "Dbsize", "Del", "Exists", "Get", "Hexists", "Hdel", "Hget", "Hgetall", "Hincrby", "Hincrbyfloat", "Hkeys", "Hlen", "Hmget", "Hmset", "Hrandfield", "Hset", "Hsetnx", "Keys", "Ping", "Select", "Set"}
+    commands := []string{"Append", "Command", "Config", "Copy", "Dbsize", "Del", "Dump", "Exists", "Get", "Hexists", "Hdel", "Hget", "Hgetall", "Hincrby", "Hincrbyfloat", "Hkeys", "Hlen", "Hmget", "Hmset", "Hrandfield", "Hset", "Hsetnx", "Keys", "Ping", "Restore", "Select", "Set", "Time"}
     return commands
 }
 
@@ -107,6 +107,8 @@ func Call(funcName string, data []string, hdl ProtoHandler, client helpers.Clien
             results = hdl.Dbsize(data, client.Db)
         case "Del":
             results = hdl.Del(data, client.Db)
+        case "Dump":
+            results = hdl.Dump(data, client.Db)
         case "Exists":
             results = hdl.Exists(data, client.Db)
         case "Get":
@@ -141,10 +143,14 @@ func Call(funcName string, data []string, hdl ProtoHandler, client helpers.Clien
             results = hdl.Keys(data, client.Db)
         case "Ping":
             results = Ping(data)
+        case "Restore":
+            results = hdl.Restore(data, client.Db)
         case "Select":
             results = Select(data, client)
         case "Set":
             results = hdl.Set(data, client.Db)
+        case "Time":
+            results = Time(data)
     }
 
     return results
@@ -294,7 +300,6 @@ func (h *ProtoHandler) Dbsize(data []string, bucketName string) string {
     return formatter.Integer(int64(count))
 }
 
-
 func (h *ProtoHandler) Del(data []string, bucketName string) string {
     if h.s.Raft.State() != raft.Leader {
         return h.forwardToLeader(data)
@@ -316,6 +321,23 @@ func (h *ProtoHandler) Del(data []string, bucketName string) string {
     }
 
     return formatter.Integer(int64(deleted))
+}
+
+func (h *ProtoHandler) Dump(data []string, bucketName string) string {
+    argobj, err := procArgs(data, 1)
+    if err != nil {
+        return formatter.BulkString(err.Error())
+    }
+
+    resultObj, _ := h.s.Store.GetData([]byte(bucketName + argobj.args[0]))
+    resLen := len(resultObj)
+
+    if resLen == 0 {
+        return "$-1\r\n"
+    } else {
+//         return formatter.BulkString(fmt.Sprintf("%v", resultObj))
+        return formatter.BulkString(string(resultObj))
+    }
 }
 
 func (h *ProtoHandler) Exists(data []string, bucketName string) string {
@@ -367,13 +389,14 @@ func (h *ProtoHandler) Get(data []string, bucketName string) string {
         }
 
 
-//         exp := m["EXP"].(int64)
-//         if exp != 0 {
-//             if exp <= timeStamp {
-//                 database.DeleteKey(bucketName, []byte(argobj.args[0]))
-//                 return "$-1\r\n"
-//             }
-//         }
+        exp := m.EXP
+        if exp != 0 {
+            timeStamp := time.Now().UnixNano() / int64(time.Millisecond)
+            if exp <= timeStamp {
+                h.s.RaftDelete(bucketName + argobj.args[0])
+                return "$-1\r\n"
+            }
+        }
 
         result := m.Data
         if m.Type != "$" {
@@ -979,7 +1002,70 @@ func Ping(data []string) string {
     }
 }
 
-// func Set(data []string, db map[string]interface{}) string{
+func (h *ProtoHandler) Restore(data []string, bucketName string) string {
+    //need to add support for IDLETIME and FREQ
+    if h.s.Raft.State() != raft.Leader {
+        return h.forwardToLeader(data)
+    }
+
+    argobj, err := procArgs(data, 3)
+    if err != nil {
+        return formatter.BulkString(err.Error())
+    }
+
+//     absTtl := helpers.Contains(argobj.args, "absttl", true)
+
+    replace := helpers.Contains(argobj.args, "replace", true)
+    if replace {
+        h.s.RaftDelete(bucketName + argobj.args[1])
+    }
+
+    replaceObj, _ := h.s.Store.GetData([]byte(bucketName + argobj.args[0]))
+    replaceLen := len(replaceObj)
+
+    if replaceLen > 0 && replace == false {
+        return formatter.BulkString("-BUSYKEY Target key name already exists.")
+    } else {
+//         var converter = map[rune]rune{}
+//         for _, runeValue := range argobj.args[2] {
+//             converter[runeValue] = runeValue
+//         }
+
+        ttl, err := strconv.Atoi(argobj.args[1])
+        if err != nil {
+            return formatter.BulkString("-ERR value is not an integer or out of range")
+        }
+        absttl := helpers.Contains(argobj.args, "absttl", true)
+        var exp int64
+        if absttl {
+            exp = int64(ttl)
+        } else {
+            if ttl != 0 {
+                exp = time.Now().UnixNano() / int64(ttl)
+            } else {
+                exp = 0
+            }
+        }
+
+        var m dataStore
+        err = msgpack.Unmarshal([]byte(argobj.args[2]), &m)
+        if err != nil {
+            panic(err)
+        }
+
+        m.EXP = exp
+        //test to make sure this is good data
+        log.Printf("this is m: %v", m)
+        do, err := msgpack.Marshal(&m)
+        log.Printf("This is do: %v", do)
+        if err != nil {
+            panic(err)
+        }
+        h.s.RaftSet(bucketName + argobj.args[0], do)
+        return formatter.Integer(int64(1))
+    }
+}
+
 func (h *ProtoHandler) Set(data []string, bucketName string) string {
     if h.s.Raft.State() != raft.Leader {
         return h.forwardToLeader(data)
@@ -1065,6 +1151,7 @@ func (h *ProtoHandler) Set(data []string, bucketName string) string {
 
 // msgpack
     do, err := msgpack.Marshal(&dataObj)
+    log.Printf("This is do: %v", do)
     if err != nil {
         panic(err)
     }
@@ -1092,4 +1179,15 @@ func Select(data []string, client helpers.Client) string {
     client.Db = "bucket" + argobj.args[0]
     helpers.ClientManager[client.SessionId] = client
     return "+OK\r\n"
+}
+
+func Time(data []string) string {
+    tm := time.Now().UnixMicro()
+    tmS := strconv.FormatInt(tm, 10)
+
+    var returnString []string
+    returnString = append(returnString, tmS[:10])
+    returnString = append(returnString, tmS[10:])
+
+    return formatter.List(returnString)
 }

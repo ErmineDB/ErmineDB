@@ -130,10 +130,10 @@ func handleConn(conn net.Conn, client helpers.Client, hdl protocol.ProtoHandler)
                 commandRequested :=  strings.ToLower(splitData[1])
                 commandRequested =  strings.Title(commandRequested)
                 if helpers.Contains(protocol.Commands(), commandRequested, false) {
-                    zlog.Info().
-                        Str("command", string(data)).
-                        Str("user", client.User).
-                        Str("remoteAddr", client.Addr).Send()
+//                     zlog.Info().
+//                         Str("command", string(data)).
+//                         Str("user", client.User).
+//                         Str("remoteAddr", client.Addr).Send()
                     lock.Lock()
                     cDB := helpers.ClientManager[client.SessionId]
                     lock.Unlock()
