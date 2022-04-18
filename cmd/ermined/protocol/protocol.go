@@ -1182,7 +1182,8 @@ func Select(data []string, client helpers.Client) string {
 }
 
 func Time(data []string) string {
-    tm := time.Now().UnixMicro()
+//     tm := time.Now().UnixMicro()
+    tm := (time.Now().UnixNano() / int64(time.Microsecond))
     tmS := strconv.FormatInt(tm, 10)
 
     var returnString []string
