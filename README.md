@@ -72,6 +72,8 @@ UNSUBSCRIBE channel
 ## Server management
 DBSIZE
 
+SWAPDB
+
 TIME
 
 ## String
