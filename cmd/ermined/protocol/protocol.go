@@ -86,7 +86,7 @@ func procArgs(data []string, minArgs int) (*argObj, error) {
 }
 
 func Commands() []string {
-    commands := []string{"Append", "Command", "Config", "Copy", "Dbsize", "Del", "Dump", "Exists", "Get", "Hexists", "Hdel", "Hget", "Hgetall", "Hincrby", "Hincrbyfloat", "Hkeys", "Hlen", "Hmget", "Hmset", "Hrandfield", "Hset", "Hsetnx", "Keys", "Ping", "Restore", "Select", "Set", "Time"}
+    commands := []string{"Append", "Command", "Config", "Copy", "Dbsize", "Del", "Dump", "Exists", "Get", "Hexists", "Hdel", "Hget", "Hgetall", "Hincrby", "Hincrbyfloat", "Hkeys", "Hlen", "Hmget", "Hmset", "Hrandfield", "Hset", "Hsetnx", "Keys", "Ping", "Restore", "Select", "Set", "Swapdb", "Time"}
     return commands
 }
 
@@ -149,6 +149,8 @@ func Call(funcName string, data []string, hdl ProtoHandler, client helpers.Clien
             results = Select(data, client)
         case "Set":
             results = hdl.Set(data, client.Db)
+        case "Swapdb":
+            results = hdl.Swapdb(data)
         case "Time":
             results = Time(data)
     }
@@ -982,7 +984,7 @@ func (h *ProtoHandler) Keys(data []string, bucketName string) string {
 
     var matched []string
     var g glob.Glob
-//     g = glob.MustCompile(argobj.args[0])
+
     g = glob.MustCompile(bucketName + argobj.args[0])
 
     for _, k := range keys.Keys {
@@ -1057,7 +1059,7 @@ func (h *ProtoHandler) Restore(data []string, bucketName string) string {
         //test to make sure this is good data
         log.Printf("this is m: %v", m)
         do, err := msgpack.Marshal(&m)
-        log.Printf("This is do: %v", do)
+//         log.Printf("This is do: %v", do)
         if err != nil {
             panic(err)
         }
@@ -1151,7 +1153,7 @@ func (h *ProtoHandler) Set(data []string, bucketName string) string {
 
 // msgpack
     do, err := msgpack.Marshal(&dataObj)
-    log.Printf("This is do: %v", do)
+//     log.Printf("This is do: %v", do)
     if err != nil {
         panic(err)
     }
@@ -1178,6 +1180,88 @@ func Select(data []string, client helpers.Client) string {
 
     client.Db = "bucket" + argobj.args[0]
     helpers.ClientManager[client.SessionId] = client
+    return "+OK\r\n"
+}
+
+func (h *ProtoHandler) Swapdb(data []string) string {
+    if h.s.Raft.State() != raft.Leader {
+        return h.forwardToLeader(data)
+    }
+
+    argobj, err := procArgs(data, 2)
+    if err != nil {
+        return formatter.BulkString(err.Error())
+    }
+
+    dbInt1, err := strconv.Atoi(argobj.args[0])
+    if err != nil {
+        return formatter.BulkString("-ERR value is not an integer or out of range")
+    }
+
+    if dbInt1 > 15 {
+        return formatter.BulkString("ERR DB index is out of range")
+    }
+
+    dbInt2, err := strconv.Atoi(argobj.args[1])
+    if err != nil {
+        return formatter.BulkString("-ERR value is not an integer or out of range")
+    }
+
+    if dbInt2 > 15 {
+        return formatter.BulkString("ERR DB index is out of range")
+    }
+
+    bucketOne := "bucket" + argobj.args[0]
+    bucketTwo := "bucket" + argobj.args[1]
+
+    var n uint16 = 65535
+    keys, _ := h.s.Store.KeysOf([]byte(""), []byte("0"), n)
+
+    var g glob.Glob
+
+    //remove prefix from bucketOne or bucketTwo
+    //copy bucketOne to temp location (temp prefix)
+    //copy bucketTwo to bucketOne
+    //delete existing
+    g1 := glob.MustCompile(bucketOne + "*")
+    g2 := glob.MustCompile(bucketTwo + "*")
+    for _, k := range keys.Keys {
+        log.Printf("looking at %v", k)
+        if g1.Match(k) {
+            log.Printf("for g1 something %v", k)
+            resultObj, _ := h.s.Store.GetData([]byte(k))
+            key := strings.TrimPrefix(k, bucketOne)
+            h.s.RaftSet("tempBucket" + key, resultObj)
+            h.s.RaftDelete(k)
+        }
+    }
+
+    keys, _ = h.s.Store.KeysOf([]byte(""), []byte("0"), n)
+    for _, k := range keys.Keys {
+        if g2.Match(k) {
+            log.Printf("for g2 something %v", k)
+            resultObj, _ := h.s.Store.GetData([]byte(k))
+            key := strings.TrimPrefix(k, bucketTwo)
+            h.s.RaftSet(bucketOne + key, resultObj)
+            h.s.RaftDelete(k)
+        }
+    }
+
+    //remove prefix from tempBucket
+    //copy to bucketTwo
+    //delete existing
+    keys, _ = h.s.Store.KeysOf([]byte(""), []byte("0"), n)
+    g = glob.MustCompile("tempBucket" + "*")
+    for _, k := range keys.Keys {
+        if g.Match(k) {
+            log.Printf("for temp something %v", k)
+            resultObj, _ := h.s.Store.GetData([]byte(k))
+            key := strings.TrimPrefix(k, "tempBucket")
+            h.s.RaftSet(bucketTwo + key, resultObj)
+            h.s.RaftDelete(k)
+        }
+    }
+
     return "+OK\r\n"
 }
 
