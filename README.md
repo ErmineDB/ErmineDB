@@ -72,7 +72,9 @@ UNSUBSCRIBE channel
 ## Server management
 DBSIZE
 
-SWAPDB
+ROLE
+
+SWAPDB index1 index2
 
 TIME
 

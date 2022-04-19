@@ -86,7 +86,7 @@ func procArgs(data []string, minArgs int) (*argObj, error) {
 }
 
 func Commands() []string {
-    commands := []string{"Append", "Command", "Config", "Copy", "Dbsize", "Del", "Dump", "Exists", "Get", "Hexists", "Hdel", "Hget", "Hgetall", "Hincrby", "Hincrbyfloat", "Hkeys", "Hlen", "Hmget", "Hmset", "Hrandfield", "Hset", "Hsetnx", "Keys", "Ping", "Restore", "Select", "Set", "Swapdb", "Time"}
+    commands := []string{"Append", "Command", "Config", "Copy", "Dbsize", "Del", "Dump", "Exists", "Get", "Hexists", "Hdel", "Hget", "Hgetall", "Hincrby", "Hincrbyfloat", "Hkeys", "Hlen", "Hmget", "Hmset", "Hrandfield", "Hset", "Hsetnx", "Keys", "Ping", "Restore", "Role", "Select", "Set", "Swapdb", "Time"}
     return commands
 }
 
@@ -145,6 +145,8 @@ func Call(funcName string, data []string, hdl ProtoHandler, client helpers.Clien
             results = Ping(data)
         case "Restore":
             results = hdl.Restore(data, client.Db)
+        case "Role":
+            results = hdl.Role(data)
         case "Select":
             results = Select(data, client)
         case "Set":
@@ -162,26 +164,28 @@ func Call(funcName string, data []string, hdl ProtoHandler, client helpers.Clien
 /* =========================
       Utility Functions
 ========================= */
-
-func (h *ProtoHandler) forwardToLeader(data []string) string {
-    configFuture := h.s.Raft.GetConfiguration()
-    log.Printf("Config: %v", configFuture)
-    log.Printf("Config: %v", h.s.Raft.Leader())
-    log.Printf("boot peers %v", h.s.BootPeers)
-
+func (h *ProtoHandler) getLeader() (string, string) {
     for key := range h.s.BootPeers {
-//         log.Printf("key: %v", key)
         sKey := strings.Split(key, ":")
         tIP := sKey[0] + ":" + sKey[1]
         leaderIP := fmt.Sprintf("%v", h.s.Raft.Leader())
         if tIP == leaderIP {
-            leaderRedis := sKey[0] + ":" + sKey[2]
-            x := fmt.Sprintf("-MOVED 0 %v \r\n", leaderRedis)
-            return x
+            return sKey[0], sKey[2]
         }
     }
+    return "", ""
+}
 
-    return "$-1\r\n"
+
+func (h *ProtoHandler) forwardToLeader(data []string) string {
+    leaderIP, leaderPort := h.getLeader()
+    if leaderIP != "" && leaderPort != "" {
+        leaderRedis := leaderIP + ":" + leaderPort
+        x := fmt.Sprintf("-MOVED 0 %v \r\n", leaderRedis)
+        return x
+    } else {
+        return "$-1\r\n"
+    }
 }
 
 
@@ -1066,6 +1070,38 @@ func (h *ProtoHandler) Restore(data []string, bucketName string) string {
         h.s.RaftSet(bucketName + argobj.args[0], do)
         return formatter.Integer(int64(1))
     }
+}
+
+func (h *ProtoHandler) Role(data []string) string {
+    log.Printf("Raft.State(): %v", h.s.Raft.State())
+    log.Printf("Raft.Stats(): %v", h.s.Raft.Stats())
+    log.Printf("Raft.Leader(): %v", h.s.Raft.Leader())
+    log.Printf("Raft.LastIndex(): %v", h.s.Raft.LastIndex())
+    log.Printf("Raft.AppliedIndex(): %v", h.s.Raft.AppliedIndex())
+    log.Printf("Raft.GetConfiguration(): %v", h.s.Raft.GetConfiguration())
+    log.Printf("Testing: %v", h.s.Raft.Stats()["latest_configuration"])
+
+//     var returnString []string
+    var rs string
+    state := fmt.Sprintf("%v", h.s.Raft.State())
+    if state != "Leader" {
+        leaderIP, leaderPort := h.getLeader()
+
+        rs += "*5\r\n"
+        rs += "$" + strconv.Itoa(len([]rune(state))) + "\r\n" + state + "\r\n"
+        rs += "$" + strconv.Itoa(len([]rune(leaderIP))) + "\r\n" + leaderIP + "\r\n"
+        rs += "$" + strconv.Itoa(len([]rune(leaderPort))) + "\r\n" + leaderPort + "\r\n"
+        rs += "$" + strconv.Itoa(len([]rune("connected"))) + "\r\n" + "connected" + "\r\n"
+        rs += ":" + fmt.Sprintf("%v", h.s.Raft.LastIndex()) + "\r\n"
+    } else {
+        rs += "*2\r\n"
+        rs += "$" + strconv.Itoa(len([]rune(state))) + "\r\n" + state + "\r\n"
+        rs += ":" + fmt.Sprintf("%v", h.s.Raft.LastIndex()) + "\r\n"
+        // need to add list of followers
+        // IP Port LastIndex
+    }
+
+    return rs
 }
 
 func (h *ProtoHandler) Set(data []string, bucketName string) string {
