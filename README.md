@@ -81,3 +81,6 @@ GET key
 
 SET key value
 
+## Commands not supported and why
+MONITOR
+This command is not needed with ErmineDB. ErmineDB can log to standard out.
