@@ -13,6 +13,10 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+data/
+data1/
+data2/
+data3/
 
 # Go workspace file
 go.work

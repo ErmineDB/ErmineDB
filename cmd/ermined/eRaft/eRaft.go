@@ -19,7 +19,7 @@ var (
 )
 
 type Server struct {
-    peerId    string // host:raftPort:httpPort TODO this may be an issue for IPV6 addresses
+    PeerId    string // host:raftPort:httpPort TODO this may be an issue for IPV6 addresses
     BootPeers map[string]bool
     dataDir   string
     Raft      *raft.Raft
@@ -31,20 +31,20 @@ func parsePeer(peer string) (string, string) {
     return fmt.Sprintf("%s:%s", peerCfg[0], peerCfg[1]), peerCfg[2]
 }
 
-func NewServer(dataDir string, peerId string, bootPeers []string) *Server {
+func NewServer(dataDir string, PeerId string, bootPeers []string) *Server {
     bootSet := make(map[string]bool)
-    bootSet[peerId] = true
+    bootSet[PeerId] = true
     for _, peer := range bootPeers {
         bootSet[peer] = true
     }
-    return &Server{peerId: peerId, dataDir: dataDir, BootPeers: bootSet}
+    return &Server{PeerId: PeerId, dataDir: dataDir, BootPeers: bootSet}
 }
 
 // This will start the Raft node and will join the cluster after the end.
 func (s *Server) Start() error {
     raftConfig := raft.DefaultConfig()
-    raftConfig.LocalID = raft.ServerID(s.peerId)
-    raftAddr, _ := parsePeer(s.peerId)
+    raftConfig.LocalID = raft.ServerID(s.PeerId)
+    raftAddr, _ := parsePeer(s.PeerId)
 
     addr, err := net.ResolveTCPAddr("tcp", raftAddr)
     if err != nil {
@@ -86,11 +86,11 @@ func (s *Server) Start() error {
 	s.Store = bst
 
 	var servers []raft.Server
-	for peerId := range s.BootPeers {
-		log.Info("Registering", "peerId", peerId)
-		peerRaft, _ := parsePeer(peerId)
+	for PeerId := range s.BootPeers {
+		log.Info("Registering", "PeerId", PeerId)
+		peerRaft, _ := parsePeer(PeerId)
 		servers = append(servers, raft.Server{
-			ID:      raft.ServerID(peerId),
+			ID:      raft.ServerID(PeerId),
 			Address: raft.ServerAddress(peerRaft),
 		})
 	}
@@ -134,7 +134,7 @@ func (s *Server) RaftDelete(key string) error {
 	return nil
 }
 
-func (s *Server) RaftJoin(peerId string) error {
+func (s *Server) RaftJoin(PeerId string) error {
 	if s.Raft.State() != raft.Leader {
 		return errors.New("not the leader")
 	}
@@ -142,15 +142,15 @@ func (s *Server) RaftJoin(peerId string) error {
 	if err := configFuture.Error(); err != nil {
 		return err
 	}
-	peerRaft, _ := parsePeer(peerId)
-	f := s.Raft.AddVoter(raft.ServerID(peerId), raft.ServerAddress(peerRaft), 0, 0)
+	peerRaft, _ := parsePeer(PeerId)
+	f := s.Raft.AddVoter(raft.ServerID(PeerId), raft.ServerAddress(peerRaft), 0, 0)
 	if f.Error() != nil {
 		return f.Error()
 	}
 	return nil
 }
 
-func (s *Server) RaftLeave(peerId string) error {
+func (s *Server) RaftLeave(PeerId string) error {
 	if s.Raft.State() != raft.Leader {
 		return errors.New("not the leader")
 	}
@@ -158,7 +158,7 @@ func (s *Server) RaftLeave(peerId string) error {
 	if err := configFuture.Error(); err != nil {
 		return err
 	}
-	future := s.Raft.RemoveServer(raft.ServerID(peerId), 0, 0)
+	future := s.Raft.RemoveServer(raft.ServerID(PeerId), 0, 0)
 	if err := future.Error(); err != nil {
 		return err
 	}

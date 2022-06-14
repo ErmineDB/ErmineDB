@@ -16,6 +16,7 @@ type Client struct {
     Subs        []string
     User        string
     SessionId   uuid.UUID
+    HostId      string
 }
 
 // var Mutex = &sync.Mutex{}
