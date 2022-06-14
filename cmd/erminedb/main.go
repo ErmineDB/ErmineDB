@@ -1,4 +1,4 @@
-package erminedb
+package main
 
 import (
 	"errors"
