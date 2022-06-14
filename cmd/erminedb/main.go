@@ -1,12 +1,12 @@
 package erminedb
 
-import {
+import (
 	"errors"
 	"sync"
 	"time"
 
 	// "github.com/ErmineDB/erminedb/internal/store"
-}
+)
 
 var {
 	ErrInvalidKey = errors.New("invalid key")
