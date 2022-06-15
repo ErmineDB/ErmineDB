@@ -4,10 +4,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ErmineDB/erminedb/cinternalmd/zset"
-	"github.com/ErmineDB/erminedb/internal/art"
-	"github.com/ErmineDB/erminedb/internal/hash"
-	"github.com/ErmineDB/erminedb/internal/set"
+	"github.com/ErmineDB/ErmineDB/internal/art"
+	"github.com/ErmineDB/ErmineDB/internal/hash"
+	"github.com/ErmineDB/ErmineDB/internal/set"
+	"github.com/ErmineDB/ErmineDB/internal/zset"
 )
 
 var (

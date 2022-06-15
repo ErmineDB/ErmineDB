@@ -3,11 +3,11 @@ package erminedb
 import (
 	"time"
 
-	"github.com/ErmineDB/erminedb/internal/aol"
+	"github.com/ErmineDB/ErmineDB/internal/aol"
 )
 
 // load String, Hash, Set and ZSet stores from append-only log
-func (db *FlashDB) load() error {
+func (db *ErmineDB) load() error {
 	if db.log == nil {
 		return nil
 	}
@@ -43,7 +43,7 @@ func (db *FlashDB) load() error {
 	return nil
 }
 
-func (db *FlashDB) loadRecord(r *record) (err error) {
+func (db *ErmineDB) loadRecord(r *record) (err error) {
 
 	switch r.getType() {
 	case StringRecord:
@@ -62,7 +62,7 @@ func (db *FlashDB) loadRecord(r *record) (err error) {
 	Utility functions to build stores from aol Record
 */
 
-func (db *FlashDB) buildStringRecord(r *record) error {
+func (db *ErmineDB) buildStringRecord(r *record) error {
 
 	key := string(r.meta.key)
 	member := string(r.meta.member)
@@ -85,7 +85,7 @@ func (db *FlashDB) buildStringRecord(r *record) error {
 	return nil
 }
 
-func (db *FlashDB) buildHashRecord(r *record) error {
+func (db *ErmineDB) buildHashRecord(r *record) error {
 
 	key := string(r.meta.key)
 	member := string(r.meta.member)
@@ -111,7 +111,7 @@ func (db *FlashDB) buildHashRecord(r *record) error {
 	return nil
 }
 
-func (db *FlashDB) buildSetRecord(r *record) error {
+func (db *ErmineDB) buildSetRecord(r *record) error {
 
 	key := string(r.meta.key)
 	member := string(r.meta.member)
@@ -139,7 +139,7 @@ func (db *FlashDB) buildSetRecord(r *record) error {
 	return nil
 }
 
-func (db *FlashDB) buildZsetRecord(r *record) error {
+func (db *ErmineDB) buildZsetRecord(r *record) error {
 
 	key := string(r.meta.key)
 	member := string(r.meta.member)

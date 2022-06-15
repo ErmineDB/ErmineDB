@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/ErmineDB/erminedb/internal/hash"
+	"github.com/ErmineDB/ErmineDB/internal/hash"
 )
 
 const (

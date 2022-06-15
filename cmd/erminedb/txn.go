@@ -1,7 +1,7 @@
 package erminedb
 
 import (
-	"github.com/Erminedb/interfaces/aol"
+	"github.com/ErmineDB/ErmineDB/internal/aol"
 )
 
 // Tx represents a transaction on the database. This transaction can either be
@@ -11,7 +11,7 @@ import (
 //
 // All transactions must be committed or rolled-back when done.
 type Tx struct {
-	db       *FlashDB        // the underlying database.
+	db       *ErmineDB       // the underlying database.
 	writable bool            // when false mutable operations fail.
 	wc       *txWriteContext // context for writable transactions.
 }
@@ -44,7 +44,7 @@ func (tx *Tx) unlock() {
 
 // managed calls a block of code that is fully contained in a transaction.
 // This method is intended to be wrapped by Update and View
-func (db *FlashDB) managed(writable bool, fn func(tx *Tx) error) (err error) {
+func (db *ErmineDB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 	var tx *Tx
 	tx, err = db.Begin(writable)
 	if err != nil {
@@ -75,7 +75,7 @@ func (db *FlashDB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 // the current read/write transaction is completed.
 //
 // All transactions must be closed by calling Commit() or Rollback() when done.
-func (db *FlashDB) Begin(writable bool) (*Tx, error) {
+func (db *ErmineDB) Begin(writable bool) (*Tx, error) {
 	tx := &Tx{
 		db:       db,
 		writable: writable,
@@ -134,7 +134,7 @@ func (tx *Tx) Commit() error {
 // View executes a function within a managed read-only transaction.
 // When a non-nil error is returned from the function that error will be return
 // to the caller of View().
-func (db *FlashDB) View(fn func(tx *Tx) error) error {
+func (db *ErmineDB) View(fn func(tx *Tx) error) error {
 	return db.managed(false, fn)
 }
 
@@ -143,7 +143,7 @@ func (db *FlashDB) View(fn func(tx *Tx) error) error {
 // In the event that an error is returned, the transaction will be rolled back.
 // When a non-nil error is returned from the function, the transaction will be
 // rolled back and the that error will be return to the caller of Update().
-func (db *FlashDB) Update(fn func(tx *Tx) error) error {
+func (db *ErmineDB) Update(fn func(tx *Tx) error) error {
 	return db.managed(true, fn)
 }
 
