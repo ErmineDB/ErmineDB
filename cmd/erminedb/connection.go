@@ -7,15 +7,25 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rs/zerolog/log"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/ErmineDB/ErmineDB/internal/formatter"
 	"github.com/ErmineDB/ErmineDB/internal/helpers"
+	"github.com/gobwas/glob"
 )
 
 type argObj struct {
 	command string
 	args    []string
+}
+
+type ProtoHandler struct {
+	S *Server
+}
+
+func NewProtoHandler(s *Server) *ProtoHandler {
+	return &ProtoHandler{S: s}
 }
 
 func procArgs(data []string, minArgs int) (*argObj, error) {
@@ -41,7 +51,7 @@ func procArgs(data []string, minArgs int) (*argObj, error) {
 }
 
 func HandleConnection(conn net.Conn, db *ErmineDB) {
-	log.Info().Msg("New connection")
+	// log.Info().Msg("New connection")
 	defer conn.Close()
 
 	for {
@@ -50,7 +60,7 @@ func HandleConnection(conn net.Conn, db *ErmineDB) {
 		var data []byte
 		var err error
 
-		data, err = reader.Peek(6) // *123\r\n
+		_, err = reader.Peek(6) // *123\r\n
 		if err != nil {
 			break
 		}
@@ -63,15 +73,20 @@ func HandleConnection(conn net.Conn, db *ErmineDB) {
 		if len(dataString) > 0 {
 			splitData := helpers.Parsedata(string(data[:]))
 			if len(splitData) > 1 {
-				command := strings.ToLower(splitData[1])
-				command = strings.Title(command)
-				log.Info().Msgf("Command: %s", command)
+				// command := strings.ToLower(splitData[1])
+				command := cases.Lower(language.Und).String(splitData[1])
+				// command = strings.Title(command)
+				command = cases.Title(language.Und).String(command)
+				// log.Info().Msgf("Command: %s", command)
 				switch command {
 				case "Del":
 					returnMsg := keyDelete(db, splitData)
 					conn.Write([]byte(returnMsg))
 				case "Get":
 					returnMsg := keyGet(db, splitData)
+					conn.Write([]byte(returnMsg))
+				case "Keys":
+					returnMsg := keyKey(db, splitData)
 					conn.Write([]byte(returnMsg))
 				case "Ping":
 					if len(splitData) == 2 {
@@ -128,7 +143,48 @@ func keyGet(db *ErmineDB, data []string) string {
 	if err != nil {
 		return "$-1\r\n"
 	}
+
 	return formatter.BulkString(val)
+}
+
+func keyKey(db *ErmineDB, data []string) string {
+	argobj, err := procArgs(data, 1)
+	if err != nil {
+		return formatter.BulkString(err.Error())
+	}
+
+	var keys []string
+	err = db.View(func(tx *Tx) error {
+		keys = tx.Keys()
+		return nil
+	})
+	if err != nil {
+		return "$-1\r\n"
+	}
+
+	var matched []string
+	var g glob.Glob = glob.MustCompile(argobj.args[0])
+	for _, v := range keys {
+		if g.Match(v) {
+			matched = append(matched, v)
+		}
+	}
+	return formatter.List(matched)
+	// var n uint16 = 65535
+	// keys, _ := h.S.Store.KeysOf([]byte(""), []byte("0"), n)
+
+	// var matched []string
+	// var g glob.Glob
+
+	// g = glob.MustCompile(bucketName + argobj.args[0])
+
+	// for _, k := range keys.Keys {
+	// 	if g.Match(k) {
+	// 		key := strings.TrimPrefix(k, bucketName)
+	// 		matched = append(matched, key)
+	// 	}
+	// }
+	// return formatter.List(matched)
 }
 
 func stringSet(db *ErmineDB, data []string) string {

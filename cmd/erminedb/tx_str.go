@@ -2,7 +2,15 @@ package erminedb
 
 import (
 	"time"
+
+	zlog "github.com/rs/zerolog/log"
 )
+
+// Get all the keys
+func (tx *Tx) Keys() (keys []string) {
+	keys = tx.db.strStore.Keys()
+	return keys
+}
 
 // Set saves a key-value pair.
 func (tx *Tx) Set(key string, value string) error {
@@ -103,5 +111,7 @@ func (tx *Tx) get(key string) (val string, err error) {
 	}
 
 	val = v.(string)
+	idx := tx.db.strStore.firstIndex(key)
+	zlog.Info().Msgf("index: %d", idx)
 	return
 }

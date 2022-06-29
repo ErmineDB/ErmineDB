@@ -8,6 +8,8 @@ import (
 	"github.com/ErmineDB/ErmineDB/internal/hash"
 	"github.com/ErmineDB/ErmineDB/internal/set"
 	"github.com/ErmineDB/ErmineDB/internal/zset"
+	"github.com/gobwas/glob"
+	zlog "github.com/rs/zerolog/log"
 )
 
 var (
@@ -39,6 +41,68 @@ func (s *strStore) get(key string) (val interface{}, err error) {
 	}
 	return
 }
+
+func (s *strStore) firstIndex(prefix string) uint64 {
+	var idx uint64
+	idx = 0
+	var g glob.Glob = glob.MustCompile(prefix)
+	zlog.Info().Msgf("firstIndex prefix: %s", prefix)
+	var i uint64 = 0
+	s.Each(func(node *art.Node) {
+		if node.IsLeaf() {
+			key := string(node.Key())
+			if g.Match(key) {
+				// idx = s.Size() - i
+				idx = i
+				zlog.Info().Msgf("tree size: %d", s.Size())
+				// zlog.Info().Msgf("%s does match %s", key, prefix)
+				return
+			} else {
+				zlog.Info().Msgf("%s doesn't match %s", key, prefix)
+				i++
+			}
+		}
+	})
+	return idx
+}
+
+func (s *strStore) lastIndex(prefix string) uint64 {
+	var idx uint64
+	idx = 0
+	var g glob.Glob = glob.MustCompile(prefix)
+	zlog.Info().Msgf("lastIndex prefix: %s", prefix)
+	var i uint64 = 0
+	s.Each(func(node *art.Node) {
+		if node.IsLeaf() {
+			key := string(node.Key())
+			if g.Match(key) {
+				// idx = s.Size() - i
+				idx = i
+				zlog.Info().Msgf("tree size: %d", s.Size())
+				zlog.Info().Msgf("%s does match %s", key, prefix)
+			} else {
+				zlog.Info().Msgf("%s doesn't match %s", key, prefix)
+				i++
+			}
+		}
+	})
+	return idx
+}
+
+// func (s *strStore) getAtIndex(idx uint64) (value []byte) {
+// 	var i uint64 = 0
+// 	s.Each(func(node *art.Node) {
+// 		if node.IsLeaf() {
+// 			if i == idx {
+// 				value = node.Value().([]byte)
+// 				return
+// 			} else {
+// 				i++
+// 			}
+// 		}
+// 	})
+// 	return value
+// }
 
 func (s *strStore) Keys() (keys []string) {
 	s.Each(func(node *art.Node) {

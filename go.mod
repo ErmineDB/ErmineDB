@@ -7,9 +7,10 @@ require (
 	github.com/gobwas/glob v0.2.3
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/go-hclog v0.9.1
-	github.com/hashicorp/raft v1.3.6
+	github.com/hashicorp/raft v1.3.9
 	github.com/rs/zerolog v1.27.0
 	github.com/shamaton/msgpack/v2 v2.1.0
+	golang.org/x/text v0.3.6
 )
 
 require (
